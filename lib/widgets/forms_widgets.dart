@@ -6,24 +6,40 @@ Widget statusChip(String status) {
   final Color fg;
   switch (status.toUpperCase()) {
     case 'ENVIADA':
-      bg = const Color(0xFF2E7D32); fg = Colors.white; break;
+      bg = const Color(0xFF2E7D32);
+      fg = Colors.white;
+      break;
     case 'GUARDADA':
-      bg = const Color(0xFFE65100); fg = Colors.white; break;
+      bg = const Color(0xFFE65100);
+      fg = Colors.white;
+      break;
     case 'ACTIVA':
     case 'ABIERTA':
-      bg = const Color(0xFF1565C0); fg = Colors.white; break;
+      bg = const Color(0xFF1565C0);
+      fg = Colors.white;
+      break;
     case 'CERRADA':
-      bg = const Color(0xFF6A1B9A); fg = Colors.white; break;
+      bg = const Color(0xFF6A1B9A);
+      fg = Colors.white;
+      break;
     case 'CREADA':
-      bg = const Color(0xFF546E7A); fg = Colors.white; break;
+      bg = const Color(0xFF546E7A);
+      fg = Colors.white;
+      break;
     default:
-      bg = const Color(0xFF90A4AE); fg = Colors.white;
+      bg = const Color(0xFF90A4AE);
+      fg = Colors.white;
   }
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+    decoration:
+        BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
     child: Text(status.toUpperCase(),
-        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.3)),
+        style: TextStyle(
+            color: fg,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.3)),
   );
 }
 
@@ -57,7 +73,8 @@ Container firebaseButton(BuildContext context, String title, Function onTap) {
 
 class PhoneInputFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
     final RegExp regExp = RegExp(r'^\+?[0-9]*$');
     if (regExp.hasMatch(newValue.text)) {
       return newValue;
@@ -67,7 +84,8 @@ class PhoneInputFormatter extends TextInputFormatter {
   }
 }
 
-Widget buildDateField(String label, TextEditingController controller, BuildContext context) {
+Widget buildDateField(
+    String label, TextEditingController controller, BuildContext context) {
   return TextFormField(
     controller: controller,
     onTap: () async {
@@ -92,11 +110,11 @@ Widget buildDateField(String label, TextEditingController controller, BuildConte
 }
 
 Widget buildDropdownField(
-    String label,
-    List<dynamic> items,
-    void Function(String?)? onChanged, {
-    required String initialValue,
-    required bool allowChange,
+  String label,
+  List<dynamic> items,
+  void Function(String?)? onChanged, {
+  required String initialValue,
+  required bool allowChange,
 }) {
   return IgnorePointer(
     ignoring: !allowChange,
@@ -110,26 +128,36 @@ Widget buildDropdownField(
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButtonFormField<String>(
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
+            // El campo exterior ya dibuja el borde; evita heredar el del tema.
             border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            filled: false,
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
           ),
+          isExpanded: true,
           value: items.contains(initialValue) ? initialValue : items.first,
           items: items.map((item) {
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(item),
+              child: Text(item, overflow: TextOverflow.ellipsis),
             );
           }).toList(),
           onChanged: allowChange ? onChanged : null,
-          disabledHint: Text(items.contains(initialValue) ? initialValue : items.first),
+          disabledHint:
+              Text(items.contains(initialValue) ? initialValue : items.first),
         ),
       ),
     ),
   );
 }
 
-
-Widget buildTextField(String label, TextEditingController controller, bool read) {
+Widget buildTextField(
+    String label, TextEditingController controller, bool read) {
   controller.addListener(() {
     final text = controller.text.toUpperCase();
     if (controller.text != text) {
@@ -156,8 +184,8 @@ Widget buildTextField(String label, TextEditingController controller, bool read)
   );
 }
 
-
-Widget buildEmailField(String label, TextEditingController controller, bool read) {
+Widget buildEmailField(
+    String label, TextEditingController controller, bool read) {
   controller.addListener(() {
     final text = controller.text.toLowerCase();
     if (controller.text != text) {
@@ -181,7 +209,8 @@ Widget buildEmailField(String label, TextEditingController controller, bool read
   );
 }
 
-Widget buildNumberField(String label, TextEditingController controller, bool read) {
+Widget buildNumberField(
+    String label, TextEditingController controller, bool read) {
   return SizedBox(
     width: 600,
     child: TextFormField(
@@ -207,7 +236,10 @@ Widget buildButton(String label, Color color, void Function()? onPressed) {
       backgroundColor: color,
       padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
     ),
-    child: Text(label, style: TextStyle(color: Colors.white),),
+    child: Text(
+      label,
+      style: TextStyle(color: Colors.white),
+    ),
   );
 }
 
@@ -244,7 +276,8 @@ class _PasswordFieldState extends State<PasswordField> {
         decoration: InputDecoration(
           labelText: widget.label,
           border: OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          contentPadding:
+              EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           suffixIcon: IconButton(
             icon: Icon(
               _obscureText ? Icons.visibility : Icons.visibility_off,

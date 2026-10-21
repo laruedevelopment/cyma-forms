@@ -19,10 +19,18 @@ class AddEditUser extends StatefulWidget {
   final String? gender;
   final String? sede;
   final bool? admin;
-  
+
   final VoidCallback reloadList;
 
-  AddEditUser({this.id, this.typeId, this.gender, this.role, this.status, this.sede, required this.reloadList, required this.admin});
+  AddEditUser(
+      {this.id,
+      this.typeId,
+      this.gender,
+      this.role,
+      this.status,
+      this.sede,
+      required this.reloadList,
+      required this.admin});
 
   @override
   // ignore: library_private_types_in_public_api
@@ -48,7 +56,13 @@ class _AddEditUserState extends State<AddEditUser> {
   late String userId;
   late bool admin;
 
-  final List<dynamic> idTypes = ['CÉDULA DE CIUDADANÍA', 'CÉDULA DE EXTRANJERÍA', 'PASAPORTE', 'NIT', 'OTRO'];
+  final List<dynamic> idTypes = [
+    'CÉDULA DE CIUDADANÍA',
+    'CÉDULA DE EXTRANJERÍA',
+    'PASAPORTE',
+    'NIT',
+    'OTRO'
+  ];
   final List<dynamic> genders = ['MASCULINO', 'FEMENINO', 'OTRO'];
   final List<dynamic> roles = ['USUARIO', 'CONSULTOR', 'ADMINISTRADOR'];
   final List<dynamic> sedes = ['BUCARAMANGA', 'BOGOTÁ'];
@@ -71,7 +85,8 @@ class _AddEditUserState extends State<AddEditUser> {
   Future<List<Parametro>> getSugPositions(String query) async {
     List<Parametro> savedCargos = await getParamwithId('Cargos');
     List<Parametro> filteredCargos = savedCargos
-        .where((cargo) => cargo.name.toLowerCase().contains(query.toLowerCase()))
+        .where(
+            (cargo) => cargo.name.toLowerCase().contains(query.toLowerCase()))
         .toList();
     filteredCargos.sort((a, b) => a.name.trim().compareTo(b.name.trim()));
     return filteredCargos;
@@ -80,7 +95,8 @@ class _AddEditUserState extends State<AddEditUser> {
   Future<List<Parametro>> getSugProfessions(String query) async {
     List<Parametro> savedProfesiones = await getParamwithId('Profesiones');
     List<Parametro> filteredProfesiones = savedProfesiones
-        .where((profesion) => profesion.name.toLowerCase().contains(query.toLowerCase()))
+        .where((profesion) =>
+            profesion.name.toLowerCase().contains(query.toLowerCase()))
         .toList();
     filteredProfesiones.sort((a, b) => a.name.trim().compareTo(b.name.trim()));
     return filteredProfesiones;
@@ -88,18 +104,20 @@ class _AddEditUserState extends State<AddEditUser> {
 
   Future<List<Parametro>> getParamwithId(String param) async {
     List<Parametro> parametros = [];
-    QuerySnapshot queryParametros = await FirebaseFirestore.instance.collection(param).where('status', isEqualTo: 'ACTIVO').get();
+    QuerySnapshot queryParametros = await FirebaseFirestore.instance
+        .collection(param)
+        .where('status', isEqualTo: 'ACTIVO')
+        .get();
     for (var doc in queryParametros.docs) {
       parametros.add(Parametro(id: doc.id, name: doc['name']));
     }
     return parametros;
   }
 
-
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize state variables with defaults or widget parameters
     userId = widget.id ?? '';
     selectedIdType = widget.typeId ?? 'CÉDULA DE CIUDADANÍA';
@@ -117,7 +135,7 @@ class _AddEditUserState extends State<AddEditUser> {
     emailController = TextEditingController();
     professionController = TextEditingController();
     positionController = TextEditingController();
-    
+
     // Initialize professional and positional data
     initProf();
     initPos();
@@ -134,7 +152,8 @@ class _AddEditUserState extends State<AddEditUser> {
       final userData = await fetchUserData(userId);
       if (userData != null) {
         // Fetch additional parameters asynchronously
-        final profession = await fetchParameter('Profesiones', userData['profession']);
+        final profession =
+            await fetchParameter('Profesiones', userData['profession']);
         final position = await fetchParameter('Cargos', userData['position']);
 
         // Update state with fetched data
@@ -153,10 +172,9 @@ class _AddEditUserState extends State<AddEditUser> {
     } catch (e) {
       print('Error fetching user data: $e');
     }
-  }  
+  }
 
-
-   @override
+  @override
   Widget build(BuildContext context) {
     professionController.addListener(() {
       final text = professionController.text.toUpperCase();
@@ -178,213 +196,234 @@ class _AddEditUserState extends State<AddEditUser> {
     });
     initPos();
     initProf();
-    print(professionsList);
-    print(positionsList);
     return AlertDialog(
-      title: Center(child: Text(widget.id != null ? 'EDITAR USUARIO' : 'CREAR USUARIO')),
-      content: Stack(
-        children: [
-          SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: buildDropdownField('TIPO DE DOCUMENTO', idTypes, (value) {
-                        setState(() {
-                          selectedIdType = value ?? 'TIPO DE DOCUMENTO'; // Ensure a default value if null
-                        });
-                      }, initialValue: selectedIdType, allowChange: true),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(child: buildTextField('NÚMERO DE IDENTIFICACIÓN', idController, false)),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: buildDropdownField('SEDE', sedes, (value) {
-                        setState(() {
-                          selectedSede = value ?? 'SEDE'; // Ensure a default value if null
-                        });
-                      }, initialValue: selectedSede, allowChange: true),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 10),
-                buildTextField('NOMBRE', nameController, false),
-                SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: buildDateField('FECHA DE NACIMIENTO', bdayController, context)),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: buildDropdownField(
-                        'GÉNERO', genders, (value) {
+      title: Center(
+          child: Text(widget.id != null ? 'EDITAR USUARIO' : 'CREAR USUARIO')),
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width < 900
+            ? MediaQuery.of(context).size.width
+            : 800,
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: buildDropdownField('TIPO DE DOCUMENTO', idTypes,
+                            (value) {
                           setState(() {
-                            selectedGender = value ?? 'GÉNERO';
+                            selectedIdType = value ??
+                                'TIPO DE DOCUMENTO'; // Ensure a default value if null
                           });
-                        }, initialValue: selectedGender, allowChange: true
-                      ),
-                    ),
-                    Visibility(
-                      visible: !admin,
-                      child: SizedBox(width: 10),
-                    ),
-                    Visibility(
-                      visible: !admin,
-                      child: Expanded(child: PasswordField(
-                        label: 'CONTRASEÑA',
-                        controller: passwordController,
-                      ),)
-                    ),
-                  ],
-                ),
-                SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: buildNumberField('CELULAR', phoneController, false)),
-                    SizedBox(width: 10),
-                    Expanded(child: buildEmailField('EMAIL (TEN PRESENTE QUE SERÁ USADO PARA EL INICIO DE SESIÓN)', emailController, widget.id != null ? true : false)),
-                  ],
-                ),
-                SizedBox(height: 10),
-                Container(
-                  constraints: BoxConstraints(maxWidth: 800),                    
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TypeAheadFormField<Parametro>(
-                          textFieldConfiguration: TextFieldConfiguration(
-                            controller: positionController,
-                            decoration: InputDecoration(
-                              labelText: 'CARGO',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                            ),
-                          ),
-                          suggestionsCallback: getSugPositions,
-                          itemBuilder: (context, cargo) {
-                            return ListTile(
-                              title: Text(cargo.name),
-                            );
-                          },
-                          onSuggestionSelected: (cargo) {
-                            setState(() {
-                              positionController.text = cargo.name;
-                              selectedPositionId = cargo.id;
-                              print(selectedPositionId);
-                            });
-                          },
-                          autovalidateMode: AutovalidateMode.always,
-                          validator: (position) {
-                            if (position!.isEmpty || !positionsList.any((cargo) => cargo.name == position)) {
-                              return 'SELECCIONE UN CARGO DE LA LISTA';
-                            } else {
-                              return null;
-                            }
-                          },
-                          onSaved: (position) {
-                            setState(() {
-                              // Handle saving the selected cargo id if needed
-                            });
-                          },
-                        ),
-                      ),                  
-                      SizedBox(width: 10),                  
-                      Expanded(
-                        child: TypeAheadFormField<Parametro>(
-                          textFieldConfiguration: TextFieldConfiguration(
-                            controller: professionController,
-                            decoration: InputDecoration(                          
-                              labelText: 'PROFESIÓN',                          
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),                        
-                            ),
-                          ),
-                          suggestionsCallback: getSugProfessions,
-                          itemBuilder: (context, profesion) {
-                            return ListTile(
-                              title: Text(profesion.name),
-                            );
-                          },
-                          onSuggestionSelected: (profesion) {
-                            setState(() {
-                              professionController.text = profesion.name;
-                              selectedProfessionId = profesion.id;
-                            });
-                          },                   
-                          autovalidateMode: AutovalidateMode.always,
-                          validator: (profession) {
-                            if (profession!.isEmpty || !professionsList.any((profesion) => profesion.name == profession)) {
-                              return 'SELECCIONE UNA PROFESIÓN DE LA LISTA';
-                            } else {
-                              return null;
-                            }
-                          },
-                          onSaved: (profession) {
-                            // Save the ocupacion to Firebase if it's a new value
-                            setState(() {
-                              
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 10),
-                Visibility(
-                  visible: admin,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: buildDropdownField(
-                          'ROL', roles, (value) {
-                            setState(() {
-                              selectedRole = value ?? 'ROL';
-                            });
-                          }, initialValue: selectedRole, allowChange: true
-                        ),
+                        }, initialValue: selectedIdType, allowChange: true),
                       ),
                       SizedBox(width: 10),
                       Expanded(
-                        child: buildDropdownField(
-                          'ESTADO', statuses, (value) {
-                            setState(() {
-                              selectedStatus = value!;
-                            });
-                          }, initialValue: selectedStatus, allowChange: true
-                        ),
+                          child: buildTextField(
+                              'NÚMERO DE IDENTIFICACIÓN', idController, false)),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: buildDropdownField('SEDE', sedes, (value) {
+                          setState(() {
+                            selectedSede = value ??
+                                'SEDE'; // Ensure a default value if null
+                          });
+                        }, initialValue: selectedSede, allowChange: true),
                       ),
                     ],
                   ),
-                ),
-                SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    buildButton('GUARDAR', Colors.green, () {
-                      if (widget.id != null) {
-                        _updateUser(userId);
-                      } else {
-                        _saveUser();
-                      }
-                    }, _isLoading),
-                    buildButton('CANCELAR', Colors.red, () => Navigator.pop(context), _isLoading),
-                  ],
-                ),
-              ],
+                  SizedBox(height: 10),
+                  buildTextField('NOMBRE', nameController, false),
+                  SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                          child: buildDateField(
+                              'FECHA DE NACIMIENTO', bdayController, context)),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: buildDropdownField('GÉNERO', genders, (value) {
+                          setState(() {
+                            selectedGender = value ?? 'GÉNERO';
+                          });
+                        }, initialValue: selectedGender, allowChange: true),
+                      ),
+                      Visibility(
+                        visible: !admin,
+                        child: SizedBox(width: 10),
+                      ),
+                      Visibility(
+                          visible: !admin,
+                          child: Expanded(
+                            child: PasswordField(
+                              label: 'CONTRASEÑA',
+                              controller: passwordController,
+                            ),
+                          )),
+                    ],
+                  ),
+                  SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                          child: buildNumberField(
+                              'CELULAR', phoneController, false)),
+                      SizedBox(width: 10),
+                      Expanded(
+                          child: buildEmailField(
+                              'EMAIL (TEN PRESENTE QUE SERÁ USADO PARA EL INICIO DE SESIÓN)',
+                              emailController,
+                              widget.id != null ? true : false)),
+                    ],
+                  ),
+                  SizedBox(height: 10),
+                  Container(
+                    constraints: BoxConstraints(maxWidth: 800),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TypeAheadFormField<Parametro>(
+                            textFieldConfiguration: TextFieldConfiguration(
+                              controller: positionController,
+                              decoration: InputDecoration(
+                                labelText: 'CARGO',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16.0, vertical: 12.0),
+                              ),
+                            ),
+                            suggestionsCallback: getSugPositions,
+                            itemBuilder: (context, cargo) {
+                              return ListTile(
+                                title: Text(cargo.name),
+                              );
+                            },
+                            onSuggestionSelected: (cargo) {
+                              setState(() {
+                                positionController.text = cargo.name;
+                                selectedPositionId = cargo.id;
+                                print(selectedPositionId);
+                              });
+                            },
+                            autovalidateMode: AutovalidateMode.always,
+                            validator: (position) {
+                              if (position!.isEmpty ||
+                                  !positionsList
+                                      .any((cargo) => cargo.name == position)) {
+                                return 'SELECCIONE UN CARGO DE LA LISTA';
+                              } else {
+                                return null;
+                              }
+                            },
+                            onSaved: (position) {
+                              setState(() {
+                                // Handle saving the selected cargo id if needed
+                              });
+                            },
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: TypeAheadFormField<Parametro>(
+                            textFieldConfiguration: TextFieldConfiguration(
+                              controller: professionController,
+                              decoration: InputDecoration(
+                                labelText: 'PROFESIÓN',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16.0, vertical: 12.0),
+                              ),
+                            ),
+                            suggestionsCallback: getSugProfessions,
+                            itemBuilder: (context, profesion) {
+                              return ListTile(
+                                title: Text(profesion.name),
+                              );
+                            },
+                            onSuggestionSelected: (profesion) {
+                              setState(() {
+                                professionController.text = profesion.name;
+                                selectedProfessionId = profesion.id;
+                              });
+                            },
+                            autovalidateMode: AutovalidateMode.always,
+                            validator: (profession) {
+                              if (profession!.isEmpty ||
+                                  !professionsList.any((profesion) =>
+                                      profesion.name == profession)) {
+                                return 'SELECCIONE UNA PROFESIÓN DE LA LISTA';
+                              } else {
+                                return null;
+                              }
+                            },
+                            onSaved: (profession) {
+                              // Save the ocupacion to Firebase if it's a new value
+                              setState(() {});
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Visibility(
+                    visible: admin,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: buildDropdownField('ROL', roles, (value) {
+                            setState(() {
+                              selectedRole = value ?? 'ROL';
+                            });
+                          }, initialValue: selectedRole, allowChange: true),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child:
+                              buildDropdownField('ESTADO', statuses, (value) {
+                            setState(() {
+                              selectedStatus = value!;
+                            });
+                          }, initialValue: selectedStatus, allowChange: true),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      buildButton('GUARDAR', Colors.green, () {
+                        if (widget.id != null) {
+                          _updateUser(userId);
+                        } else {
+                          _saveUser();
+                        }
+                      }, _isLoading),
+                      buildButton('CANCELAR', Colors.red,
+                          () => Navigator.pop(context), _isLoading),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          // Show loading indicator when _isLoading is true
-          if (_isLoading)
-            Center(
-              child: CircularProgressIndicator(),
-            ),
-        ],
+            // Show loading indicator when _isLoading is true
+            if (_isLoading)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.white.withOpacity(0.6),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+          ],
+        ),
       ),
     );
-  }  
+  }
 
   void _saveUser() async {
     // Validate fields
@@ -423,6 +462,7 @@ class _AddEditUserState extends State<AddEditUser> {
         // the admin's own session is kept and the Firestore writes below are
         // made as the admin.
         final String newUid;
+        bool passwordEmailSent = false;
         if (widget.admin == true) {
           final secondaryApp = await Firebase.initializeApp(
             name: 'userCreation',
@@ -430,17 +470,26 @@ class _AddEditUserState extends State<AddEditUser> {
           );
           try {
             final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
-            final credential = await secondaryAuth.createUserWithEmailAndPassword(
+            final credential =
+                await secondaryAuth.createUserWithEmailAndPassword(
               email: emailController.text,
               password: randomAlphaNumeric(10),
             );
             newUid = credential.user!.uid;
+            // La contraseña inicial es aleatoria: la persona define la suya
+            // desde el enlace que recibe por correo.
+            try {
+              await secondaryAuth.sendPasswordResetEmail(
+                  email: emailController.text);
+              passwordEmailSent = true;
+            } catch (_) {}
             await secondaryAuth.signOut();
           } finally {
             await secondaryApp.delete();
           }
         } else {
-          final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          final credential =
+              await FirebaseAuth.instance.createUserWithEmailAndPassword(
             email: emailController.text,
             password: passwordController.text,
           );
@@ -448,7 +497,10 @@ class _AddEditUserState extends State<AddEditUser> {
         }
 
         // Step 3: Save user data to Firestore
-        await FirebaseFirestore.instance.collection('Usuarios').doc(newUid).set({
+        await FirebaseFirestore.instance
+            .collection('Usuarios')
+            .doc(newUid)
+            .set({
           'idType': selectedIdType.toUpperCase(),
           'id': idController.text.toUpperCase(),
           'name': nameController.text.toUpperCase(),
@@ -464,21 +516,19 @@ class _AddEditUserState extends State<AddEditUser> {
         });
         late QuerySnapshot encuestasSnapshot;
 
-        if(selectedRole == 'USUARIO'){
-          if(selectedPositionId == 'CG0007'){
+        if (selectedRole == 'USUARIO') {
+          if (selectedPositionId == 'CG0007') {
             encuestasSnapshot = await FirebaseFirestore.instance
-              .collection('Encuestas')
-              .where('status', isEqualTo: 'ACTIVA')
-              .where('tipo', whereIn: ['G', 'T'])
-              .get();
+                .collection('Encuestas')
+                .where('status', isEqualTo: 'ACTIVA')
+                .where('tipo', whereIn: ['G', 'T']).get();
           } else {
             encuestasSnapshot = await FirebaseFirestore.instance
-              .collection('Encuestas')
-              .where('status', isEqualTo: 'ACTIVA')
-              .where('tipo', whereIn: ['U', 'T'])
-              .get();
+                .collection('Encuestas')
+                .where('status', isEqualTo: 'ACTIVA')
+                .where('tipo', whereIn: ['U', 'T']).get();
           }
-          // Step 5: Add user to "Usuarios" subcollection in "Encuestas" with "ACTIVA" status      
+          // Step 5: Add user to "Usuarios" subcollection in "Encuestas" with "ACTIVA" status
 
           for (var encuestaDoc in encuestasSnapshot.docs) {
             await FirebaseFirestore.instance
@@ -490,7 +540,7 @@ class _AddEditUserState extends State<AddEditUser> {
               'status': 'ABIERTA',
             });
           }
-        }        
+        }
         widget.reloadList();
         // User saved successfully, set loading to false
         setState(() {
@@ -500,8 +550,12 @@ class _AddEditUserState extends State<AddEditUser> {
         Navigator.pop(context, 'save');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('El usuario ha sido creado con éxito.'),
-            duration: Duration(seconds: 4),
+            content: Text(widget.admin == true
+                ? (passwordEmailSent
+                    ? 'El usuario ha sido creado. Le enviamos un correo para que defina su contraseña.'
+                    : 'El usuario ha sido creado, pero no se pudo enviar el correo de contraseña. Debe usar "Recuperar contraseña" en el inicio de sesión.')
+                : 'El usuario ha sido creado con éxito.'),
+            duration: Duration(seconds: 6),
           ),
         );
       } on FirebaseAuthException catch (e) {
@@ -529,26 +583,29 @@ class _AddEditUserState extends State<AddEditUser> {
           _isLoading = true;
         });
 
-        await FirebaseFirestore.instance.collection('Usuarios').doc(widget.id).update({
+        await FirebaseFirestore.instance
+            .collection('Usuarios')
+            .doc(widget.id)
+            .update({
           'idType': selectedIdType.toUpperCase(),
-        'id': idController.text.toUpperCase(),
-        'name': nameController.text.toUpperCase(),
-        'bday': bdayController.text.toUpperCase(),
-        'gender': selectedGender.toUpperCase(),
-        'phone': phoneController.text.toUpperCase(),
-        'email': emailController.text.toLowerCase(),
-        'position': selectedPositionId?.toUpperCase(),
-        'profession': selectedProfessionId?.toUpperCase(),
-        'role': selectedRole.toUpperCase(),
-        'status': selectedStatus.toUpperCase(),
-        'sede': selectedSede.toUpperCase()
+          'id': idController.text.toUpperCase(),
+          'name': nameController.text.toUpperCase(),
+          'bday': bdayController.text.toUpperCase(),
+          'gender': selectedGender.toUpperCase(),
+          'phone': phoneController.text.toUpperCase(),
+          'email': emailController.text.toLowerCase(),
+          'position': selectedPositionId?.toUpperCase(),
+          'profession': selectedProfessionId?.toUpperCase(),
+          'role': selectedRole.toUpperCase(),
+          'status': selectedStatus.toUpperCase(),
+          'sede': selectedSede.toUpperCase()
         });
 
         // User updated successfully, set loading to false
         setState(() {
           _isLoading = false;
         });
-        
+
         widget.reloadList();
 
         Navigator.pop(context, 'save');
@@ -572,43 +629,57 @@ class _AddEditUserState extends State<AddEditUser> {
     }
   }
 
-  Widget buildButton(String text, Color color, VoidCallback onPressed, bool isLoading) {
+  Widget buildButton(
+      String text, Color color, VoidCallback onPressed, bool isLoading) {
     return ElevatedButton(
       onPressed: isLoading ? null : onPressed,
       style: ElevatedButton.styleFrom(
-        foregroundColor: Colors.white, backgroundColor: color,
+        foregroundColor: Colors.white,
+        backgroundColor: color,
       ),
       child: Text(text),
     );
   }
 
   bool _validateFields() {
-
-    bool isPositionValid = positionsList.any((position) => position.id == selectedPositionId);
-    bool isProfessionValid = professionsList.any((profession) => profession.id == selectedProfessionId);
+    bool isPositionValid =
+        positionsList.any((position) => position.id == selectedPositionId);
+    bool isProfessionValid = professionsList
+        .any((profession) => profession.id == selectedProfessionId);
 
     // Perform other validations
-    if (idController.text.isEmpty ||
-        nameController.text.isEmpty ||
-        bdayController.text.isEmpty ||
-        phoneController.text.isEmpty ||
-        emailController.text.isEmpty ||
-        !genders.contains(selectedGender) ||
-        !idTypes.contains(selectedIdType) ||
-        !statuses.contains(selectedStatus) ||
-        !roles.contains(selectedRole) ||
-        !sedes.contains(selectedSede) ||
-        !isPositionValid ||
-        !isProfessionValid) {
+    final missing = <String>[
+      if (idController.text.isEmpty) 'número de identificación',
+      if (nameController.text.isEmpty) 'nombre',
+      if (bdayController.text.isEmpty) 'fecha de nacimiento',
+      if (phoneController.text.isEmpty) 'celular',
+      if (emailController.text.isEmpty) 'email',
+      if (!genders.contains(selectedGender)) 'género',
+      if (!idTypes.contains(selectedIdType)) 'tipo de documento',
+      if (!statuses.contains(selectedStatus)) 'estado',
+      if (!roles.contains(selectedRole)) 'rol',
+      if (!sedes.contains(selectedSede)) 'sede',
+      if (!isPositionValid) 'cargo (elige uno de la lista)',
+      if (!isProfessionValid) 'profesión (elige una de la lista)',
+    ];
+    if (missing.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Falta completar: ${missing.join(', ')}.'),
+          duration: Duration(seconds: 5),
+        ),
+      );
       return false;
     }
 
     // Validate password only when admin is false
     if (widget.admin != true) {
-      if (passwordController.text.isEmpty || passwordController.text.length < 6) {
+      if (passwordController.text.isEmpty ||
+          passwordController.text.length < 6) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Por favor, ingrese una contraseña con al menos 6 caracteres.'),
+            content: Text(
+                'Por favor, ingrese una contraseña con al menos 6 caracteres.'),
             duration: Duration(seconds: 4),
           ),
         );
@@ -618,7 +689,7 @@ class _AddEditUserState extends State<AddEditUser> {
 
     // All validations passed
     return true;
-  }  
+  }
 }
 
 class Parametro {

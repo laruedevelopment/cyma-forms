@@ -20,6 +20,8 @@ class _SignInPageState extends State<SignInPage> {
     setState(() {}); // Empty setState just to trigger rebuild
   }
 
+  bool _loggingIn = false;
+
   final TextEditingController _passwordTextcontroller = TextEditingController();
   final TextEditingController _emailTextController = TextEditingController();
 
@@ -51,14 +53,18 @@ class _SignInPageState extends State<SignInPage> {
                     const SizedBox(
                       height: 20,
                     ),
-                    Text('SISTEMA DE ENCUESTAS MOP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),),
+                    Text(
+                      'SISTEMA DE ENCUESTAS MOP',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                    ),
                     const SizedBox(
                       height: 20,
                     ),
                     Container(
-                      constraints: const BoxConstraints(maxWidth: 800),
-                      child: buildEmailField('EMAIL', _emailTextController, false)
-                    ),
+                        constraints: const BoxConstraints(maxWidth: 800),
+                        child: buildEmailField(
+                            'EMAIL', _emailTextController, false)),
                     const SizedBox(
                       height: 20,
                     ),
@@ -84,12 +90,18 @@ class _SignInPageState extends State<SignInPage> {
                     ),
                     Container(
                         constraints: const BoxConstraints(maxWidth: 800),
-                        child: firebaseButton(context, "INICIAR SESIÓN", () async {
+                        child:
+                            firebaseButton(context, "INICIAR SESIÓN", () async {
+                          if (_loggingIn) return;
+                          setState(() => _loggingIn = true);
                           final messenger = ScaffoldMessenger.of(context);
                           void showError() {
                             messenger.showSnackBar(
                               SnackBar(
-                                content: Text('Tus datos no coinciden con nuestra información, verifícalos o crea una cuenta.', style: TextStyle(color: Colors.white),),
+                                content: Text(
+                                  'Tus datos no coinciden con nuestra información, verifícalos o crea una cuenta.',
+                                  style: TextStyle(color: Colors.white),
+                                ),
                                 duration: Duration(seconds: 4),
                                 backgroundColor: Color.fromRGBO(214, 66, 66, 1),
                               ),
@@ -103,14 +115,17 @@ class _SignInPageState extends State<SignInPage> {
                                     password: _passwordTextcontroller.text);
                             final uid = credential.user!.uid;
                             final userData = await fetchUserData(uid);
-                            if (userData == null || userData['status'] != 'ACTIVO') {
+                            if (userData == null ||
+                                userData['status'] != 'ACTIVO') {
                               await FirebaseAuth.instance.signOut();
                               showError();
                               return;
                             }
                             messenger.showSnackBar(
                               SnackBar(
-                                content: Text('Bienvenid@ ${userData['name']}, inicio de sesión satisfactorio.', style: TextStyle(color: Colors.black)),
+                                content: Text(
+                                    'Bienvenid@ ${userData['name']}, inicio de sesión satisfactorio.',
+                                    style: TextStyle(color: Colors.black)),
                                 duration: Duration(seconds: 4),
                                 backgroundColor: Color.fromRGBO(52, 194, 64, 1),
                               ),
@@ -118,38 +133,52 @@ class _SignInPageState extends State<SignInPage> {
                             Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (context) => MainMenu(role: userData['role'], uid: uid)));
+                                    builder: (context) => MainMenu(
+                                        role: userData['role'], uid: uid)));
                           } catch (_) {
                             showError();
+                          } finally {
+                            if (mounted) setState(() => _loggingIn = false);
                           }
-                        })),
+                        }, loading: _loggingIn)),
                     Container(
-                      constraints: const BoxConstraints(maxWidth: 800),                                        
+                      constraints: const BoxConstraints(maxWidth: 800),
                       width: MediaQuery.of(context).size.width,
                       height: 50,
                       margin: const EdgeInsets.fromLTRB(0, 10, 0, 20),
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(90)),
+                      decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(90)),
                       child: ElevatedButton(
                         onPressed: () {
                           showDialog(
-                            context: context,
-                            builder: (BuildContext context) {
-                              return AddEditUser(reloadList: _reloadList, admin: false,);
-                            }
-                          );
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AddEditUser(
+                                  reloadList: _reloadList,
+                                  admin: false,
+                                );
+                              });
                         },
                         style: ButtonStyle(
-                          backgroundColor: WidgetStateProperty.resolveWith((states) {
-                            if (states.contains(WidgetState.pressed)) {
+                            backgroundColor:
+                                WidgetStateProperty.resolveWith((states) {
+                              if (states.contains(WidgetState.pressed)) {
+                                return Colors.amber;
+                              }
                               return Colors.amber;
-                            }
-                            return Colors.amber;
-                          }),
-                          shape: WidgetStateProperty.all<RoundedRectangleBorder>(
-                              RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30)))),
-                        child: Text('CREAR USUARIO', style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),),
+                            }),
+                            shape:
+                                WidgetStateProperty.all<RoundedRectangleBorder>(
+                                    RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(30)))),
+                        child: Text(
+                          'CREAR USUARIO',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16),
+                        ),
                       ),
                     ),
                     const SizedBox(
@@ -174,7 +203,8 @@ class _SignInPageState extends State<SignInPage> {
         child: Text(
           "¿Olvidaste tu contraseña?",
           style: TextStyle(
-              color: Colors.black.withOpacity(0.8), fontWeight: FontWeight.bold),
+              color: Colors.black.withOpacity(0.8),
+              fontWeight: FontWeight.bold),
           textAlign: TextAlign.right,
         ),
         onPressed: () {
@@ -192,9 +222,11 @@ class _SignInPageState extends State<SignInPage> {
       GestureDetector(
         onTap: () {
           FirebaseAuth.instance.signInAnonymously().then((value) {
-            Navigator.push(context,
-                MaterialPageRoute(builder: (context) => MainMenu(role: 'ANONIMO', uid: '')));
-          // ignore: sdk_version_since
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => MainMenu(role: 'ANONIMO', uid: '')));
+            // ignore: sdk_version_since
           }).onError((error, stackTrace) {});
         },
         child: Container(
@@ -204,9 +236,7 @@ class _SignInPageState extends State<SignInPage> {
           child: Center(
             child: Text(
               "CONTINUAR SIN INICIAR SESIÓN",
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
             ),
           ),
         ),

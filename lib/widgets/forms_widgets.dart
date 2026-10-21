@@ -43,16 +43,19 @@ Widget statusChip(String status) {
   );
 }
 
-Container firebaseButton(BuildContext context, String title, Function onTap) {
+Container firebaseButton(BuildContext context, String title, Function onTap,
+    {bool loading = false}) {
   return Container(
     width: MediaQuery.of(context).size.width,
     height: 50,
     margin: const EdgeInsets.fromLTRB(0, 10, 0, 20),
     decoration: BoxDecoration(borderRadius: BorderRadius.circular(90)),
     child: ElevatedButton(
-        onPressed: () {
-          onTap();
-        },
+        onPressed: loading
+            ? null
+            : () {
+                onTap();
+              },
         style: ButtonStyle(
             backgroundColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.pressed)) {
@@ -63,11 +66,20 @@ Container firebaseButton(BuildContext context, String title, Function onTap) {
             shape: WidgetStateProperty.all<RoundedRectangleBorder>(
                 RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30)))),
-        child: Text(
-          title,
-          style: TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-        )),
+        child: loading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                    strokeWidth: 3, color: Color(0xFF1A3A6B)),
+              )
+            : Text(
+                title,
+                style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16),
+              )),
   );
 }
 

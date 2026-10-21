@@ -1,11 +1,11 @@
 // ignore_for_file: use_build_context_synchronously
 
-import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:forms_app/form.dart';
 import 'package:forms_app/services/firebase_services.dart';
+import 'package:forms_app/services/hours_utils.dart';
 import 'package:forms_app/widgets/forms_widgets.dart';
 import 'package:intl/intl.dart';
 
@@ -39,7 +39,6 @@ class _ListUserFormsState extends State<ListUserForms> {
       _futureForms = getEncuestasUser(uid);
     });
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -77,125 +76,159 @@ class _ListUserFormsState extends State<ListUserForms> {
                       itemCount: snapshot.data?.length,
                       itemBuilder: (context, index) {
                         final item = snapshot.data?[index];
-                        final userStatus = item?['user']['status'] as String? ?? '';
-                        final surveyStatus = item?['data']['status'] as String? ?? '';
+                        final userStatus =
+                            item?['user']['status'] as String? ?? '';
+                        final surveyStatus =
+                            item?['data']['status'] as String? ?? '';
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                          leading: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(item?['id'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1A3A6B))),
-                            ],
-                          ),
-                          title: Text(item?['data']['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text(
-                            '${item?['data']['startDate']} - ${item?['data']['endDate']}',
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF78909C)),
-                          ),
-                          trailing: SizedBox(
-                            width: 170,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              crossAxisAlignment: CrossAxisAlignment.center,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 6),
+                            leading: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                userStatus != 'ABIERTA' ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    statusChip(userStatus),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      DateFormat('dd-MM-yyyy HH:mm').format(item?['user']['date'].toDate()),
-                                      style: const TextStyle(fontSize: 11, color: Color(0xFF78909C)),
-                                    ),
-                                  ],
-                                ) : statusChip(surveyStatus),
-                                const SizedBox(width: 6),
-                                IconButton(
-                                  onPressed: () async {
-                                    String? status = await getStatus(item?['id'], uid);
-                                    print(status);
-                                    if (status != item?['user']['status']) {
-                                      _reloadList();
-                                    }
-
-                                    if (item?['data']['status'] == 'ACTIVA') {
-                                      // ACTIVA: se puede editar / responder
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => FormsPage(
-                                            idForm: item?['id'], // Accessing the document ID
-                                            formName: item?['data']['name'],
-                                            dates: item?['data']['startDate'] +
-                                                ' - ' +
-                                                item?['data']['endDate'],
-                                            uidUser: uid,
-                                            hours: max(
-                                              (int.parse(item?['data']['days']) * 9) - 1,
-                                              0,
-                                            ).toString(),
-                                            formState: item?['user']['status'],
-                                            answers: item?['user']['status'] == 'ABIERTA'
-                                                ? 'NULL'
-                                                : item?['user']['answer'],
-                                            date: item?['user']['status'] == 'ABIERTA'
-                                                ? DateTime.now()
-                                                : (item?['user']['date'] as Timestamp).toDate(),
-                                            reloadList: _reloadList,
-                                          ),
-                                        ),
-                                      );
-                                    } else {
-                                      // NO ACTIVA: solo visualizar, y mostrar mensaje
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => FormsPage(
-                                            idForm: item?['id'], // Accessing the document ID
-                                            formName: item?['data']['name'],
-                                            dates: item?['data']['startDate'] +
-                                                ' - ' +
-                                                item?['data']['endDate'],
-                                            uidUser: uid,
-                                            hours: max(
-                                              (int.parse(item?['data']['days']) * 9) - 1,
-                                              0,
-                                            ).toString(),
-                                            formState: 'ENVIADA',
-                                            answers: item?['user']['status'] == 'ABIERTA'
-                                                ? 'NULL'
-                                                : item?['user']['answer'],
-                                            date: item?['user']['status'] == 'ABIERTA'
-                                                ? DateTime.now()
-                                                : (item?['user']['date'] as Timestamp).toDate(),
-                                            reloadList: _reloadList,
-                                          ),
-                                        ),
-                                      );
-
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('La encuesta ya ha sido cerrada.'),
-                                          duration: Duration(seconds: 4),
-                                        ),
-                                      );
-                                    }
-
-                                    // 🔁 Al volver de FormsPage, volvemos a consultar Firestore
-                                    _reloadList();
-                                  },
-                                  icon: item?['user']['status'] == 'ENVIADA'
-                                      ? const Icon(Icons.visibility, color: Colors.blueAccent)
-                                      : const Icon(Icons.edit, color: Colors.blueAccent),
-                                ),
+                                Text(item?['id'] ?? '',
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1A3A6B))),
                               ],
                             ),
-                          ),
-                        ),  // ListTile
-                      );    // Card
+                            title: Text(item?['data']['name'] ?? '',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                              '${item?['data']['startDate']} - ${item?['data']['endDate']}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF78909C)),
+                            ),
+                            trailing: SizedBox(
+                              width: 170,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  userStatus != 'ABIERTA'
+                                      ? Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            statusChip(userStatus),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              DateFormat('dd-MM-yyyy HH:mm')
+                                                  .format(item?['user']['date']
+                                                      .toDate()),
+                                              style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Color(0xFF78909C)),
+                                            ),
+                                          ],
+                                        )
+                                      : statusChip(surveyStatus),
+                                  const SizedBox(width: 6),
+                                  IconButton(
+                                    onPressed: () async {
+                                      String? status =
+                                          await getStatus(item?['id'], uid);
+                                      print(status);
+                                      if (status != item?['user']['status']) {
+                                        _reloadList();
+                                      }
+
+                                      if (item?['data']['status'] == 'ACTIVA') {
+                                        // ACTIVA: se puede editar / responder
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => FormsPage(
+                                              idForm: item?[
+                                                  'id'], // Accessing the document ID
+                                              formName: item?['data']['name'],
+                                              dates: item?['data']
+                                                      ['startDate'] +
+                                                  ' - ' +
+                                                  item?['data']['endDate'],
+                                              uidUser: uid,
+                                              hours: horasEsperadasDe(
+                                                  item?['data']),
+                                              formState: item?['user']
+                                                  ['status'],
+                                              answers: item?['user']
+                                                          ['status'] ==
+                                                      'ABIERTA'
+                                                  ? 'NULL'
+                                                  : item?['user']['answer'],
+                                              date: item?['user']['status'] ==
+                                                      'ABIERTA'
+                                                  ? DateTime.now()
+                                                  : (item?['user']['date']
+                                                          as Timestamp)
+                                                      .toDate(),
+                                              reloadList: _reloadList,
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        // NO ACTIVA: solo visualizar, y mostrar mensaje
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => FormsPage(
+                                              idForm: item?[
+                                                  'id'], // Accessing the document ID
+                                              formName: item?['data']['name'],
+                                              dates: item?['data']
+                                                      ['startDate'] +
+                                                  ' - ' +
+                                                  item?['data']['endDate'],
+                                              uidUser: uid,
+                                              hours: horasEsperadasDe(
+                                                  item?['data']),
+                                              formState: 'ENVIADA',
+                                              answers: item?['user']
+                                                          ['status'] ==
+                                                      'ABIERTA'
+                                                  ? 'NULL'
+                                                  : item?['user']['answer'],
+                                              date: item?['user']['status'] ==
+                                                      'ABIERTA'
+                                                  ? DateTime.now()
+                                                  : (item?['user']['date']
+                                                          as Timestamp)
+                                                      .toDate(),
+                                              reloadList: _reloadList,
+                                            ),
+                                          ),
+                                        );
+
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'La encuesta ya ha sido cerrada.'),
+                                            duration: Duration(seconds: 4),
+                                          ),
+                                        );
+                                      }
+
+                                      // 🔁 Al volver de FormsPage, volvemos a consultar Firestore
+                                      _reloadList();
+                                    },
+                                    icon: item?['user']['status'] == 'ENVIADA'
+                                        ? const Icon(Icons.visibility,
+                                            color: Colors.blueAccent)
+                                        : const Icon(Icons.edit,
+                                            color: Colors.blueAccent),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ), // ListTile
+                        ); // Card
                       },
                     );
                   } else {
@@ -236,7 +269,4 @@ class _ListUserFormsState extends State<ListUserForms> {
       return null; // or handle as appropriate
     }
   }
-
 }
-
-

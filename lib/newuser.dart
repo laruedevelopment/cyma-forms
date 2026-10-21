@@ -3,6 +3,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:forms_app/services/firebase_services.dart';
@@ -394,34 +395,60 @@ class _AddEditUserState extends State<AddEditUser> {
           _isLoading = true;
         });
 
-        // Step 1: Check if email is already in use
-        QuerySnapshot querySnapshot = await FirebaseFirestore.instance
-            .collection('Usuarios')
-            .where('email', isEqualTo: emailController.text.toLowerCase())
-            .get();
+        // Step 1: Check if email is already in use (only admins can query Usuarios;
+        // for public sign-ups Firebase Auth reports email-already-in-use)
+        if (widget.admin == true) {
+          QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+              .collection('Usuarios')
+              .where('email', isEqualTo: emailController.text.toLowerCase())
+              .get();
 
-        if (querySnapshot.docs.isNotEmpty) {
-          // Email already in use
-          setState(() {
-            _isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('El correo electrónico ya está en uso.'),
-              duration: Duration(seconds: 4),
-            ),
-          );
-          return; // Exit the function if email is in use
+          if (querySnapshot.docs.isNotEmpty) {
+            // Email already in use
+            setState(() {
+              _isLoading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('El correo electrónico ya está en uso.'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+            return; // Exit the function if email is in use
+          }
         }
 
-        // Step 2: Create user in Firebase Authentication
-        UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: emailController.text,
-          password: widget.admin == true ? randomAlphaNumeric(10) : passwordController.text,
-        );
+        // Step 2: Create user in Firebase Authentication.
+        // When an admin creates the account, a secondary Firebase app is used so
+        // the admin's own session is kept and the Firestore writes below are
+        // made as the admin.
+        final String newUid;
+        if (widget.admin == true) {
+          final secondaryApp = await Firebase.initializeApp(
+            name: 'userCreation',
+            options: Firebase.app().options,
+          );
+          try {
+            final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+            final credential = await secondaryAuth.createUserWithEmailAndPassword(
+              email: emailController.text,
+              password: randomAlphaNumeric(10),
+            );
+            newUid = credential.user!.uid;
+            await secondaryAuth.signOut();
+          } finally {
+            await secondaryApp.delete();
+          }
+        } else {
+          final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: emailController.text,
+            password: passwordController.text,
+          );
+          newUid = credential.user!.uid;
+        }
 
         // Step 3: Save user data to Firestore
-        await FirebaseFirestore.instance.collection('Usuarios').doc(userCredential.user!.uid).set({
+        await FirebaseFirestore.instance.collection('Usuarios').doc(newUid).set({
           'idType': selectedIdType.toUpperCase(),
           'id': idController.text.toUpperCase(),
           'name': nameController.text.toUpperCase(),
@@ -458,7 +485,7 @@ class _AddEditUserState extends State<AddEditUser> {
                 .collection('Encuestas')
                 .doc(encuestaDoc.id)
                 .collection('Usuarios')
-                .doc(userCredential.user!.uid)
+                .doc(newUid)
                 .set({
               'status': 'ABIERTA',
             });
@@ -483,7 +510,9 @@ class _AddEditUserState extends State<AddEditUser> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al crear el usuario: ${e.message}'),
+            content: Text(e.code == 'email-already-in-use'
+                ? 'El correo electrónico ya está en uso.'
+                : 'Error al crear el usuario: ${e.message}'),
             duration: Duration(seconds: 4),
           ),
         );
@@ -554,15 +583,6 @@ class _AddEditUserState extends State<AddEditUser> {
   }
 
   bool _validateFields() {
-    print(idController.text);
-    print(nameController.text);
-    print(bdayController.text);
-    print(phoneController.text);
-    print(emailController.text);
-    print(positionsList);
-    print(selectedPositionId);
-    print(professionsList);
-    print(selectedProfessionId);
 
     bool isPositionValid = positionsList.any((position) => position.id == selectedPositionId);
     bool isProfessionValid = professionsList.any((profession) => profession.id == selectedProfessionId);

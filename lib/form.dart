@@ -19,8 +19,19 @@ class FormsPage extends StatefulWidget {
   final String answers;
   final DateTime date;
   final VoidCallback reloadList;
-  FormsPage({super.key, required this.idForm, required this.formName, required this.dates, required this.uidUser, required this.hours, required this.formState, required this.answers, required this.date, required this.reloadList,});
-  
+  FormsPage({
+    super.key,
+    required this.idForm,
+    required this.formName,
+    required this.dates,
+    required this.uidUser,
+    required this.hours,
+    required this.formState,
+    required this.answers,
+    required this.date,
+    required this.reloadList,
+  });
+
   @override
   State<FormsPage> createState() => _FormsPageState();
 }
@@ -33,7 +44,7 @@ class _FormsPageState extends State<FormsPage> {
   final TextEditingController roleController = TextEditingController();
   final TextEditingController positionController = TextEditingController();
   final TextEditingController professionController = TextEditingController();
-  final TextEditingController sedeController = TextEditingController();  
+  final TextEditingController sedeController = TextEditingController();
   // Projects and activities
   List<Map<String, dynamic>> projects = [];
   List<Parametro> projectsList = [];
@@ -47,7 +58,6 @@ class _FormsPageState extends State<FormsPage> {
   late final Future<void> dataFetch;
   bool isLoading = true; // Loading state
 
-
   // Initialize controllers and data in initState
   @override
   void initState() {
@@ -57,18 +67,20 @@ class _FormsPageState extends State<FormsPage> {
     projectControllers = [];
     activityControllers = [];
     hoursControllers = [];
-    enviarEncuesta = widget.formState == 'ENVIADA' ?  true : false;
+    enviarEncuesta = widget.formState == 'ENVIADA' ? true : false;
     _formKey = GlobalKey<FormState>();
-    
+
     dataFetch = retrieveDataAndInit().whenComplete(() {
-      if (widget.formState != 'ABIERTA' && widget.answers != 'NULL' && widget.answers.isNotEmpty) {
+      if (widget.formState != 'ABIERTA' &&
+          widget.answers != 'NULL' &&
+          widget.answers.isNotEmpty) {
         projects = loadAnswers(widget.answers);
         //print(1);
         //print(projects);
-        initializeControllers(projects);   
+        initializeControllers(projects);
         updateTotalHours();
       }
-    });    
+    });
     updateTotalHours();
     setState(() {
       isLoading = false; // Data is no longer loading
@@ -123,10 +135,10 @@ class _FormsPageState extends State<FormsPage> {
       rows.add({
         'idencuesta': idEncuesta,
         'idusuario': idUsuario,
-        'proyecto':  p['project'],
+        'proyecto': p['project'],
         'actividad': p['activity'],
-        'horas':     p['hours'],
-        'fecha':     fechaString, // mismo formato que ya usas (toString)
+        'horas': p['hours'],
+        'fecha': fechaString, // mismo formato que ya usas (toString)
       });
     }
 
@@ -141,12 +153,12 @@ class _FormsPageState extends State<FormsPage> {
           Uri.parse(scriptURL),
           body: {
             'submissionId': submissionId,
-            'rows': convert.jsonEncode(rows), // rows va como JSON en un campo de formulario
+            'rows': convert.jsonEncode(
+                rows), // rows va como JSON en un campo de formulario
           },
         );
 
         print('POST Sheets attempt=$attempt status=${resp.statusCode}');
-        print('POST Sheets body=${resp.body}');
 
         if (resp.statusCode == 200) {
           final data = convert.jsonDecode(resp.body);
@@ -171,9 +183,6 @@ class _FormsPageState extends State<FormsPage> {
     return false;
   }
 
-
-
-
   Future<void> initPro() async {
     projectsList = await getParamwithId('Proyectos');
     projectsList.sort((a, b) => a.name.trim().compareTo(b.name.trim()));
@@ -185,9 +194,7 @@ class _FormsPageState extends State<FormsPage> {
 
   Future<List<Parametro>> getSugProjects(String query) async {
     final q = query.toLowerCase();
-    return projectsList
-        .where((p) => p.name.toLowerCase().contains(q))
-        .toList()
+    return projectsList.where((p) => p.name.toLowerCase().contains(q)).toList()
       ..sort((a, b) => a.name.trim().compareTo(b.name.trim()));
   }
 
@@ -201,17 +208,21 @@ class _FormsPageState extends State<FormsPage> {
   Future<List<Parametro>> getParamwithId(String param) async {
     List<Parametro> parametros = [];
     QuerySnapshot queryParametros;
-    if(widget.formState == 'ENVIADA'){
-      queryParametros = await FirebaseFirestore.instance.collection(param).get();
+    if (widget.formState == 'ENVIADA') {
+      queryParametros =
+          await FirebaseFirestore.instance.collection(param).get();
     } else {
-      queryParametros = await FirebaseFirestore.instance.collection(param).where('status', isNotEqualTo: 'INACTIVO').get();
+      queryParametros = await FirebaseFirestore.instance
+          .collection(param)
+          .where('status', isNotEqualTo: 'INACTIVO')
+          .get();
     }
     for (var doc in queryParametros.docs) {
       parametros.add(Parametro(id: doc.id, name: doc['name']));
     }
     return parametros;
   }
-  
+
   Future<void> retrieveData() async {
     try {
       DocumentSnapshot snapshot = await FirebaseFirestore.instance
@@ -222,7 +233,8 @@ class _FormsPageState extends State<FormsPage> {
         // Access data from snapshot
         Map<String, dynamic>? data = snapshot.data() as Map<String, dynamic>?;
         if (data != null) {
-          final profession = await fetchParameter('Profesiones', data['profession']);
+          final profession =
+              await fetchParameter('Profesiones', data['profession']);
           final position = await fetchParameter('Cargos', data['position']);
           setState(() {
             idTypeController.text = data['idType'] ?? '';
@@ -243,11 +255,7 @@ class _FormsPageState extends State<FormsPage> {
 
   void addProject() {
     setState(() {
-      final newProject = {
-        'projectName': '',
-        'activityName': '',
-        'hours': '0'
-      };
+      final newProject = {'projectName': '', 'activityName': '', 'hours': '0'};
       projects.add(newProject);
       final projectController = TextEditingController();
       final activityController = TextEditingController();
@@ -269,7 +277,6 @@ class _FormsPageState extends State<FormsPage> {
     });
   }
 
-
   void removeProject(int index) {
     setState(() {
       projects.removeAt(index);
@@ -288,7 +295,7 @@ class _FormsPageState extends State<FormsPage> {
     for (var project in projects) {
       var temp = project['hours'];
       if (temp != null && temp.toString().isNotEmpty) {
-        newTotal += double.parse(temp.toString());
+        newTotal += double.tryParse(temp.toString().replaceAll(',', '.')) ?? 0;
       }
     }
     setState(() {
@@ -296,14 +303,14 @@ class _FormsPageState extends State<FormsPage> {
     });
   }
 
-
   bool pressed = false;
 
   @override
-  Widget build(BuildContext context) {    
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Center(child: Text('${widget.formName.toUpperCase()} - ${widget.dates}')),
+        title: Center(
+            child: Text('${widget.formName.toUpperCase()} - ${widget.dates}')),
       ),
       body: Stack(
         children: [
@@ -314,401 +321,524 @@ class _FormsPageState extends State<FormsPage> {
               child: Form(
                 key: _formKey,
                 child: FutureBuilder(
-                  future: dataFetch,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    } else {
-                      return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('DATOS DEL ENCUESTADO',
-                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1A3A6B), letterSpacing: 0.5)),
-                                const Divider(height: 14),
-                                Wrap(
-                                  spacing: 32,
-                                  runSpacing: 10,
+                    future: dataFetch,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      } else {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _infoField('TIPO DOC.', idTypeController.text),
-                                    _infoField('IDENTIFICACIÓN', idController.text),
-                                    _infoField('SEDE', sedeController.text),
-                                    _infoField('NOMBRE', nameController.text),
-                                    _infoField('ROL', roleController.text),
-                                    _infoField('CARGO', positionController.text),
-                                    _infoField('PROFESIÓN', professionController.text),
+                                    const Text('DATOS DEL ENCUESTADO',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1A3A6B),
+                                            letterSpacing: 0.5)),
+                                    const Divider(height: 14),
+                                    Wrap(
+                                      spacing: 32,
+                                      runSpacing: 10,
+                                      children: [
+                                        _infoField(
+                                            'TIPO DOC.', idTypeController.text),
+                                        _infoField('IDENTIFICACIÓN',
+                                            idController.text),
+                                        _infoField('SEDE', sedeController.text),
+                                        _infoField(
+                                            'NOMBRE', nameController.text),
+                                        _infoField('ROL', roleController.text),
+                                        _infoField(
+                                            'CARGO', positionController.text),
+                                        _infoField('PROFESIÓN',
+                                            professionController.text),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'LISTA DE ACTIVIDADES',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                Expanded(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Checkbox(
+                                        value: enviarEncuesta,
+                                        onChanged: widget.formState != 'ENVIADA'
+                                            ? (bool? value) {
+                                                setState(() {
+                                                  enviarEncuesta =
+                                                      value ?? false;
+                                                });
+                                              }
+                                            : null,
+                                      ),
+                                      Text('ENVIAR ENCUESTA'),
+                                    ],
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'HORAS ESPERADAS: $expectedHours',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      'HORAS REGISTRADAS: $totalHours',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'LISTA DE ACTIVIDADES',
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            SizedBox(height: 10),
+                            ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: projects.length,
+                              itemBuilder: (context, index) {
+                                return buildProjectItem(index);
+                              },
                             ),
-                            Expanded(
+                            SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed:
+                                  isLoading || widget.formState == 'ENVIADA'
+                                      ? null
+                                      : addProject,
+                              child: Text('AGREGAR ELEMENTO'),
+                            ),
+                            SizedBox(height: 20),
+                            Visibility(
+                              visible: /*widget.formState != 'ENVIADA'*/ false,
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: [                                                
-                                  Checkbox(
-                                    value: enviarEncuesta,
-                                    onChanged: widget.formState != 'ENVIADA' ? (bool? value) {
-                                      setState(() {
-                                        enviarEncuesta = value ?? false;
-                                      });
-                                    } : null,
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                        onPressed: () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return AddParam(
+                                                  param: 'Proyectos',
+                                                  reloadList: _reloadList);
+                                            },
+                                          );
+                                        },
+                                        child: Text('AGREGAR NUEVO PROYECTO')),
                                   ),
-                                  Text('ENVIAR ENCUESTA'),
+                                  SizedBox(width: 20),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                        onPressed: () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return AddParam(
+                                                  param: 'Actividades',
+                                                  reloadList: _reloadList);
+                                            },
+                                          );
+                                        },
+                                        child: Text('AGREGAR NUEVA ACTIVIDAD')),
+                                  ),
                                 ],
                               ),
                             ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  'HORAS ESPERADAS: $expectedHours',
-                                  style: TextStyle(fontSize: 14,),
-                                ),
-                                Text(
-                                  'HORAS REGISTRADAS: $totalHours',
-                                  style: TextStyle(fontSize: 14,),
-                                ),
-                              ],
+                            SizedBox(height: 20),
+                            ElevatedButton(
+                              onPressed: widget.formState == 'ENVIADA' ||
+                                      pressed
+                                  ? null
+                                  : () async {
+                                      // Lock the button immediately to prevent double-submit
+                                      setState(() {
+                                        pressed = true;
+                                        isLoading = true;
+                                      });
+
+                                      String currentState = await getFormState(
+                                          widget.idForm, widget.uidUser);
+                                      if (currentState != 'ENVIADA') {
+                                        bool toReview = false;
+                                        bool confirmed = true;
+
+                                        if (enviarEncuesta) {
+                                          confirmed = await showDialog(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return AlertDialog(
+                                                title: Text(
+                                                    '¿Está seguro de que desea enviar la encuesta?'),
+                                                content: Text(
+                                                  (double.tryParse(
+                                                                  expectedHours) ??
+                                                              0) !=
+                                                          totalHours
+                                                      ? 'Registraste $totalHours h y se esperan $expectedHours h. ¿Enviar de todas formas? Esta acción no es reversible.'
+                                                      : 'Esta acción no es reversible.',
+                                                  style:
+                                                      TextStyle(fontSize: 18),
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Navigator.of(context)
+                                                          .pop(false);
+                                                    },
+                                                    child: Text('Cancelar'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Navigator.of(context)
+                                                          .pop(true);
+                                                    },
+                                                    child: Text('Confirmar'),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        }
+
+                                        if (!confirmed) {
+                                          setState(() {
+                                            isLoading = false;
+                                            pressed = false;
+                                          });
+                                          return;
+                                        }
+
+                                        // Continue with the rest of your logic to update projects and send the survey...
+                                        setState(() {
+                                          for (int i = 0;
+                                              i < projects.length;
+                                              i++) {
+                                            projects[i]['projectName'] =
+                                                projectControllers[i].text;
+                                            projects[i]['activityName'] =
+                                                activityControllers[i].text;
+                                            projects[i]['hours'] =
+                                                hoursControllers[i].text;
+                                          }
+                                        });
+
+                                        if (projects.isEmpty &&
+                                            enviarEncuesta) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  'Por favor, agregue al menos una actividad.'),
+                                              duration: Duration(seconds: 4),
+                                            ),
+                                          );
+                                          setState(() {
+                                            isLoading = false;
+                                            pressed = false;
+                                          });
+                                          return;
+                                        }
+
+                                        for (var controller
+                                            in activityControllers) {
+                                          if (controller.text.isEmpty) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Por favor, complete todos los campos de actividades.'),
+                                                duration: Duration(seconds: 4),
+                                              ),
+                                            );
+                                            setState(() {
+                                              isLoading = false;
+                                              pressed = false;
+                                            });
+                                            return; // Prevent form submission if any activityController is empty
+                                          }
+                                        }
+
+                                        for (var controller
+                                            in projectControllers) {
+                                          if (controller.text.isEmpty) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Por favor, complete todos los campos de proyectos.'),
+                                                duration: Duration(seconds: 4),
+                                              ),
+                                            );
+                                            setState(() {
+                                              isLoading = false;
+                                              pressed = false;
+                                            });
+                                            return; // Prevent form submission if any projectController is empty
+                                          }
+                                        }
+
+                                        // Check if any hoursController is empty
+                                        for (var controller
+                                            in hoursControllers) {
+                                          if (controller.text.isEmpty ||
+                                              controller.text == '0') {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Por favor, complete todos los campos de horas.'),
+                                                duration: Duration(seconds: 4),
+                                              ),
+                                            );
+                                            setState(() {
+                                              isLoading = false;
+                                              pressed = false;
+                                            });
+                                            return; // Prevent form submission if any hoursController is empty
+                                          }
+                                        }
+
+                                        // Then, handle new projects and activities
+                                        for (var project in projects) {
+                                          if (!projectsList.any((p) =>
+                                              p.name ==
+                                              project['projectName'])) {
+                                            // Check if project was already created in this session
+                                            toReview = true;
+                                          } else {
+                                            project['project'] = projectsList
+                                                .firstWhere((p) =>
+                                                    p.name ==
+                                                    project['projectName'])
+                                                .id;
+                                          }
+
+                                          if (!activitiesList.any((a) =>
+                                              a.name ==
+                                              project['activityName'])) {
+                                            // Check if activity was already created in this session
+                                            toReview = true;
+                                          } else {
+                                            project['activity'] = activitiesList
+                                                .firstWhere((a) =>
+                                                    a.name ==
+                                                    project['activityName'])
+                                                .id;
+                                          }
+                                        }
+
+                                        if (!toReview) {
+                                          try {
+                                            // Single timestamp used everywhere to keep data consistent
+                                            final DateTime now = DateTime.now();
+                                            final String fechaString =
+                                                now.toString();
+
+                                            List<String> projectStrings = [];
+                                            for (var project in projects) {
+                                              projectStrings.add(
+                                                  "?idencuesta=${widget.idForm}&idusuario=${widget.uidUser}&proyecto=${project['project']}&actividad=${project['activity']}&horas=${project['hours']}&fecha=$fechaString");
+                                            }
+                                            final String resultString =
+                                                projectStrings.join(';');
+
+                                            final bool tempEnv = enviarEncuesta;
+
+                                            // Pre-flight check right before Sheets: abort early if already ENVIADA
+                                            // (reduces race-condition window with concurrent sessions)
+                                            if (tempEnv) {
+                                              final preFlightState =
+                                                  await getFormState(
+                                                      widget.idForm,
+                                                      widget.uidUser);
+                                              if (preFlightState == 'ENVIADA') {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                        'Esta encuesta ya fue enviada.'),
+                                                    duration:
+                                                        Duration(seconds: 4),
+                                                  ),
+                                                );
+                                                setState(() {
+                                                  isLoading = false;
+                                                });
+                                                Navigator.of(context).pop();
+                                                return;
+                                              }
+                                            }
+
+                                            bool sheetsOk = false;
+                                            if (tempEnv) {
+                                              const String scriptURL =
+                                                  'https://script.google.com/macros/s/AKfycbx5IBms2-rf8gDG4aBQD1i-MwrybevSjf7NJMSFmTAZMGZ5OiznEHIWO15FmW2WMcGJ/exec';
+                                              sheetsOk =
+                                                  await _sendToSheetsAtomic(
+                                                scriptURL: scriptURL,
+                                                idEncuesta: widget.idForm,
+                                                idUsuario: widget.uidUser,
+                                                projects: projects,
+                                                fechaString: fechaString,
+                                              );
+                                            }
+
+                                            // Transactional Firestore update: final safeguard against race conditions
+                                            bool alreadyEnviada = false;
+                                            final docRef = FirebaseFirestore
+                                                .instance
+                                                .collection('Encuestas')
+                                                .doc(widget.idForm)
+                                                .collection('Usuarios')
+                                                .doc(widget.uidUser);
+
+                                            await FirebaseFirestore.instance
+                                                .runTransaction(
+                                                    (transaction) async {
+                                              final snapshot =
+                                                  await transaction.get(docRef);
+                                              final currentStatus =
+                                                  snapshot.data()?['status'] ??
+                                                      '';
+                                              if (currentStatus == 'ENVIADA') {
+                                                alreadyEnviada = true;
+                                                return;
+                                              }
+                                              transaction.update(docRef, {
+                                                'answer': resultString,
+                                                'status': sheetsOk
+                                                    ? 'ENVIADA'
+                                                    : 'GUARDADA',
+                                                'date': now,
+                                                'idencuesta': widget.idForm,
+                                              });
+                                            });
+
+                                            if (alreadyEnviada) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                      'Esta encuesta ya fue enviada.'),
+                                                  duration:
+                                                      Duration(seconds: 4),
+                                                ),
+                                              );
+                                              setState(() {
+                                                isLoading = false;
+                                              });
+                                              Navigator.of(context).pop();
+                                              return;
+                                            }
+
+                                            String snackText;
+                                            if (tempEnv && sheetsOk) {
+                                              snackText =
+                                                  'Encuesta enviada exitosamente.';
+                                            } else if (tempEnv && !sheetsOk) {
+                                              snackText =
+                                                  'Tus respuestas se guardaron, pero no se pudo enviar a Google Sheets por un problema de red.';
+                                            } else {
+                                              snackText =
+                                                  'Encuesta guardada exitosamente.';
+                                            }
+
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text(snackText),
+                                                  duration: const Duration(
+                                                      seconds: 4)),
+                                            );
+
+                                            widget.reloadList();
+                                            setState(() {
+                                              isLoading = false;
+                                            });
+                                            Navigator.of(context).pop();
+                                          } catch (e) {
+                                            // Any network or Firestore error: reset state so user can retry
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Error al guardar la encuesta. Por favor intente de nuevo.'),
+                                                duration:
+                                                    const Duration(seconds: 5),
+                                                backgroundColor:
+                                                    Colors.red.shade700,
+                                              ),
+                                            );
+                                            setState(() {
+                                              isLoading = false;
+                                              pressed = false;
+                                            });
+                                          }
+                                        } else {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  'Por favor, cree los proyectos o actividades faltantes.'),
+                                              duration: Duration(seconds: 4),
+                                            ),
+                                          );
+                                          setState(() {
+                                            isLoading = false;
+                                            pressed = false;
+                                          });
+                                          return;
+                                        }
+                                        widget.reloadList();
+                                        setState(() {
+                                          isLoading = false;
+                                        });
+                                        Navigator.of(context).pop();
+                                      } else {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                                'Esta encuesta ya fue enviada.'),
+                                            duration: Duration(seconds: 4),
+                                          ),
+                                        );
+                                        setState(() {});
+                                      }
+                                    },
+                              child: Text(enviarEncuesta
+                                  ? 'ENVIAR ENCUESTA'
+                                  : 'GUARDAR ENCUESTA'),
                             ),
                           ],
-                        ),
-                        SizedBox(height: 10),
-                        ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: projects.length,
-                          itemBuilder: (context, index) {
-                            return buildProjectItem(index);
-                          },
-                        ),
-                        SizedBox(height: 10),
-                        ElevatedButton(
-                          onPressed: isLoading || widget.formState == 'ENVIADA' ? null : addProject,
-                          child: Text('AGREGAR ELEMENTO'),
-                        ),
-                        SizedBox(height: 20),
-                        Visibility(
-                          visible: /*widget.formState != 'ENVIADA'*/false,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(onPressed: (){showDialog(
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      return AddParam(param: 'Proyectos', reloadList: _reloadList);
-                                    },
-                                  );},
-                                  child: Text('AGREGAR NUEVO PROYECTO')
-                                ),
-                              ),
-                              SizedBox(width: 20),
-                              Expanded(
-                                child: ElevatedButton(onPressed: (){showDialog(
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      return AddParam(param: 'Actividades', reloadList: _reloadList);
-                                    },
-                                  );},
-                                  child: Text('AGREGAR NUEVA ACTIVIDAD')
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: widget.formState == 'ENVIADA' || pressed ? null : () async {
-                            // Lock the button immediately to prevent double-submit
-                            setState(() {
-                              pressed = true;
-                              isLoading = true;
-                            });
-
-                            String currentState = await getFormState(widget.idForm, widget.uidUser);
-                            if (currentState != 'ENVIADA') {
-
-                              bool toReview = false;
-                              bool confirmed = true;
-
-                              if (enviarEncuesta) {
-                                confirmed = await showDialog(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                      title: Text('¿Está seguro de que desea enviar la encuesta?'),
-                                      content: Text('Esta acción no es reversible.', style: TextStyle(fontSize: 18),),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.of(context).pop(false);
-                                          },
-                                          child: Text('Cancelar'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.of(context).pop(true);
-                                          },
-                                          child: Text('Confirmar'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              }
-
-                              if (!confirmed) {
-                                setState(() {
-                                  isLoading = false;
-                                  pressed = false;
-                                });
-                                return;
-                              }
-
-                              // Continue with the rest of your logic to update projects and send the survey...
-                              setState(() {
-                                for (int i = 0; i < projects.length; i++) {
-                                  projects[i]['projectName'] = projectControllers[i].text;
-                                  projects[i]['activityName'] = activityControllers[i].text;
-                                  projects[i]['hours'] = hoursControllers[i].text;
-                                }
-                              });
-
-                              if (projects.isEmpty && enviarEncuesta) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Por favor, agregue al menos una actividad.'),
-                                    duration: Duration(seconds: 4),
-                                  ),
-                                );
-                                setState(() {
-                                  isLoading = false;
-                                  pressed = false;
-                                });
-                                return;
-                              }
-
-                              for (var controller in activityControllers) {
-                                if (controller.text.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Por favor, complete todos los campos de actividades.'),
-                                      duration: Duration(seconds: 4),
-                                    ),
-                                  );
-                                  setState(() {
-                                    isLoading = false;
-                                    pressed = false;
-                                  });
-                                  return; // Prevent form submission if any activityController is empty
-                                }
-                              }
-
-                              for (var controller in projectControllers) {
-                                if (controller.text.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Por favor, complete todos los campos de proyectos.'),
-                                      duration: Duration(seconds: 4),
-                                    ),
-                                  );
-                                  setState(() {
-                                    isLoading = false;
-                                    pressed = false;
-                                  });
-                                  return; // Prevent form submission if any projectController is empty
-                                }
-                              }
-
-                              // Check if any hoursController is empty
-                              for (var controller in hoursControllers) {
-                                if (controller.text.isEmpty || controller.text == '0') {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Por favor, complete todos los campos de horas.'),
-                                      duration: Duration(seconds: 4),
-                                    ),
-                                  );
-                                  setState(() {
-                                    isLoading = false;
-                                    pressed = false;
-                                  });
-                                  return; // Prevent form submission if any hoursController is empty
-                                }
-                              }
-
-                              // Then, handle new projects and activities
-                              for (var project in projects) {
-                                if (!projectsList.any((p) => p.name == project['projectName'])) {
-                                  // Check if project was already created in this session
-                                  toReview = true;
-                                } else {
-                                  project['project'] = projectsList.firstWhere((p) => p.name == project['projectName']).id;
-                                }
-
-                                if (!activitiesList.any((a) => a.name == project['activityName'])) {
-                                  // Check if activity was already created in this session
-                                  toReview = true;
-                                } else {
-                                  project['activity'] = activitiesList.firstWhere((a) => a.name == project['activityName']).id;
-                                }
-                              }
-
-                              if (!toReview) {
-                                try {
-                                  // Single timestamp used everywhere to keep data consistent
-                                  final DateTime now = DateTime.now();
-                                  final String fechaString = now.toString();
-
-                                  List<String> projectStrings = [];
-                                  for (var project in projects) {
-                                    projectStrings.add("?idencuesta=${widget.idForm}&idusuario=${widget.uidUser}&proyecto=${project['project']}&actividad=${project['activity']}&horas=${project['hours']}&fecha=$fechaString");
-                                  }
-                                  final String resultString = projectStrings.join(';');
-
-                                  final bool tempEnv = enviarEncuesta;
-
-                                  // Pre-flight check right before Sheets: abort early if already ENVIADA
-                                  // (reduces race-condition window with concurrent sessions)
-                                  if (tempEnv) {
-                                    final preFlightState = await getFormState(widget.idForm, widget.uidUser);
-                                    if (preFlightState == 'ENVIADA') {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Esta encuesta ya fue enviada.'),
-                                          duration: Duration(seconds: 4),
-                                        ),
-                                      );
-                                      setState(() { isLoading = false; });
-                                      Navigator.of(context).pop();
-                                      return;
-                                    }
-                                  }
-
-                                  bool sheetsOk = false;
-                                  if (tempEnv) {
-                                    const String scriptURL = 'https://script.google.com/macros/s/AKfycbx5IBms2-rf8gDG4aBQD1i-MwrybevSjf7NJMSFmTAZMGZ5OiznEHIWO15FmW2WMcGJ/exec';
-                                    sheetsOk = await _sendToSheetsAtomic(
-                                      scriptURL: scriptURL,
-                                      idEncuesta: widget.idForm,
-                                      idUsuario: widget.uidUser,
-                                      projects: projects,
-                                      fechaString: fechaString,
-                                    );
-                                  }
-
-                                  // Transactional Firestore update: final safeguard against race conditions
-                                  bool alreadyEnviada = false;
-                                  final docRef = FirebaseFirestore.instance
-                                    .collection('Encuestas').doc(widget.idForm)
-                                    .collection('Usuarios').doc(widget.uidUser);
-
-                                  await FirebaseFirestore.instance.runTransaction((transaction) async {
-                                    final snapshot = await transaction.get(docRef);
-                                    final currentStatus = snapshot.data()?['status'] ?? '';
-                                    if (currentStatus == 'ENVIADA') {
-                                      alreadyEnviada = true;
-                                      return;
-                                    }
-                                    transaction.update(docRef, {
-                                      'answer': resultString,
-                                      'status': sheetsOk ? 'ENVIADA' : 'GUARDADA',
-                                      'date': now,
-                                      'idencuesta': widget.idForm,
-                                    });
-                                  });
-
-                                  if (alreadyEnviada) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Esta encuesta ya fue enviada.'),
-                                        duration: Duration(seconds: 4),
-                                      ),
-                                    );
-                                    setState(() { isLoading = false; });
-                                    Navigator.of(context).pop();
-                                    return;
-                                  }
-
-                                  String snackText;
-                                  if (tempEnv && sheetsOk) {
-                                    snackText = 'Encuesta enviada exitosamente.';
-                                  } else if (tempEnv && !sheetsOk) {
-                                    snackText = 'Tus respuestas se guardaron, pero no se pudo enviar a Google Sheets por un problema de red.';
-                                  } else {
-                                    snackText = 'Encuesta guardada exitosamente.';
-                                  }
-
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(snackText), duration: const Duration(seconds: 4)),
-                                  );
-
-                                  widget.reloadList();
-                                  setState(() { isLoading = false; });
-                                  Navigator.of(context).pop();
-
-                                } catch (e) {
-                                  // Any network or Firestore error: reset state so user can retry
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Error al guardar la encuesta. Por favor intente de nuevo.'),
-                                      duration: const Duration(seconds: 5),
-                                      backgroundColor: Colors.red.shade700,
-                                    ),
-                                  );
-                                  setState(() { isLoading = false; pressed = false; });
-                                }
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Por favor, cree los proyectos o actividades faltantes.'),
-                                    duration: Duration(seconds: 4),
-                                  ),
-                                );
-                                setState(() {
-                                  isLoading = false;
-                                  pressed = false;
-                                });
-                                return;
-                              }
-                              widget.reloadList();
-                              setState(() { isLoading = false; });
-                              Navigator.of(context).pop();
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Esta encuesta ya fue enviada.'),
-                                    duration: Duration(seconds: 4),
-                                  ),
-                                );
-                              setState(() {});
-                            }
-                          },
-                          child: Text(enviarEncuesta ? 'ENVIAR ENCUESTA' : 'GUARDAR ENCUESTA'),
-                        ),
-
-          
-                      ],
-                    );
-                  }
-                }),
+                        );
+                      }
+                    }),
               ),
             ),
           ),
@@ -738,7 +868,7 @@ class _FormsPageState extends State<FormsPage> {
 
   late final _formKey;
   bool saving = false;
-  
+
   List<Map<String, String>> loadAnswers(String encodedString) {
     List<Map<String, String>> parsedList = [];
     List<String> items = encodedString.split(';');
@@ -779,7 +909,7 @@ class _FormsPageState extends State<FormsPage> {
     return parsedList;
   }
 
-  void initializeControllers(List<Map<String, dynamic>> answers){
+  void initializeControllers(List<Map<String, dynamic>> answers) {
     for (int i = 0; i < answers.length; i++) {
       var answer = answers[i];
       if (answer.containsKey('project') && answer.containsKey('activity')) {
@@ -842,10 +972,13 @@ class _FormsPageState extends State<FormsPage> {
                     labelText: 'PROYECTO',
                     labelStyle: TextStyle(color: Colors.black),
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                   ),
                   style: TextStyle(
-                    color: widget.formState == 'ENVIADA' ? Colors.black : null, // Cambia el color del texto si está deshabilitado
+                    color: widget.formState == 'ENVIADA'
+                        ? Colors.black
+                        : null, // Cambia el color del texto si está deshabilitado
                   ),
                 ),
                 suggestionsCallback: getSugProjects,
@@ -860,7 +993,8 @@ class _FormsPageState extends State<FormsPage> {
                 validator: (proyecto) {
                   if (proyecto!.isEmpty) {
                     return 'SELECCIONE UN PROYECTO DE LA LISTA';
-                  } else if (!projectsList.any((project) => project.name == proyecto)) {
+                  } else if (!projectsList
+                      .any((project) => project.name == proyecto)) {
                     return 'DEBE CREAR UN NUEVO PROYECTO';
                   } else {
                     return null;
@@ -872,9 +1006,13 @@ class _FormsPageState extends State<FormsPage> {
                   );
                 },
                 onSaved: (proyecto) async {
-                  if (proyecto != null && !projectsList.any((project) => project.name == proyecto)) {
+                  if (proyecto != null &&
+                      !projectsList
+                          .any((project) => project.name == proyecto)) {
                     await saveParameter('Proyectos', proyecto, 'PENDIENTE');
-                    projectsList.add(Parametro(id: DateTime.now().toString(), name: proyecto)); // Temporarily add the new project
+                    projectsList.add(Parametro(
+                        id: DateTime.now().toString(),
+                        name: proyecto)); // Temporarily add the new project
                   }
                 },
                 noItemsFoundBuilder: (context) {
@@ -892,10 +1030,13 @@ class _FormsPageState extends State<FormsPage> {
                     labelText: 'ACTIVIDAD',
                     labelStyle: TextStyle(color: Colors.black),
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                   ),
                   style: TextStyle(
-                    color: widget.formState == 'ENVIADA' ? Colors.black : null, // Cambia el color del texto si está deshabilitado
+                    color: widget.formState == 'ENVIADA'
+                        ? Colors.black
+                        : null, // Cambia el color del texto si está deshabilitado
                   ),
                 ),
                 suggestionsCallback: getSugActivities,
@@ -910,7 +1051,8 @@ class _FormsPageState extends State<FormsPage> {
                 validator: (activity) {
                   if (activity!.isEmpty) {
                     return 'SELECCIONE UNA ACTIVIDAD DE LA LISTA';
-                  } else if (!activitiesList.any((act) => act.name == activity)) {
+                  } else if (!activitiesList
+                      .any((act) => act.name == activity)) {
                     return 'DEBE CREAR UNA NUEVA ACTIVIDAD';
                   } else {
                     return null;
@@ -946,15 +1088,19 @@ class _FormsPageState extends State<FormsPage> {
                   labelText: 'HORAS DEDICADAS',
                   labelStyle: TextStyle(color: Colors.black),
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                 ),
                 style: TextStyle(
-                  color: widget.formState == 'ENVIADA' ? Colors.black : null, // Cambia el color del texto si está deshabilitado
+                  color: widget.formState == 'ENVIADA'
+                      ? Colors.black
+                      : null, // Cambia el color del texto si está deshabilitado
                 ),
                 onChanged: (value) {
                   double? newValue = double.tryParse(value);
                   setState(() {
-                    projects[index]['hours'] = newValue?.toString(); // Store as String to avoid type issues
+                    projects[index]['hours'] = newValue
+                        ?.toString(); // Store as String to avoid type issues
                     updateTotalHours();
                   });
                   // Preserve cursor position
@@ -967,10 +1113,14 @@ class _FormsPageState extends State<FormsPage> {
             ),
             SizedBox(height: 10),
             IconButton(
-              onPressed: widget.formState == 'ENVIADA' ? null : () {
-                removeProject(index);
-              },
-              icon: Icon(Icons.delete_outline, color: widget.formState == 'ENVIADA' ? Colors.grey : Colors.red),
+              onPressed: widget.formState == 'ENVIADA'
+                  ? null
+                  : () {
+                      removeProject(index);
+                    },
+              icon: Icon(Icons.delete_outline,
+                  color:
+                      widget.formState == 'ENVIADA' ? Colors.grey : Colors.red),
             ),
           ],
         ),
@@ -978,7 +1128,8 @@ class _FormsPageState extends State<FormsPage> {
     );
   }
 
-  Widget buildTextField(String labelText, TextEditingController controller, bool readOnly) {
+  Widget buildTextField(
+      String labelText, TextEditingController controller, bool readOnly) {
     return TextFormField(
       controller: controller,
       readOnly: readOnly,
@@ -996,27 +1147,34 @@ class _FormsPageState extends State<FormsPage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(label,
-            style: const TextStyle(fontSize: 10, color: Color(0xFF78909C),
-                fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+            style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFF78909C),
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3)),
         const SizedBox(height: 2),
         Text(value.isNotEmpty ? value : '—',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87)),
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87)),
       ],
     );
   }
 
   String getProjectNameById(String id) {
     if (id.isEmpty) return '';
-    var project = projectsList.firstWhere((p) => p.id == id, orElse: () => Parametro(id: '', name: ''));
+    var project = projectsList.firstWhere((p) => p.id == id,
+        orElse: () => Parametro(id: '', name: ''));
     return project.name;
   }
 
   String getActivityNameById(String id) {
     if (id.isEmpty) return '';
-    var activity = activitiesList.firstWhere((a) => a.id == id, orElse: () => Parametro(id: '', name: ''));
+    var activity = activitiesList.firstWhere((a) => a.id == id,
+        orElse: () => Parametro(id: '', name: ''));
     return activity.name;
   }
-
 }
 
 class Parametro {
@@ -1049,7 +1207,6 @@ class _AddParamState extends State<AddParam> {
 
   @override
   Widget build(BuildContext context) {
-
     return AlertDialog(
       title: Center(child: Text('AGREGAR ${widget.param.toUpperCase()}')),
       content: SizedBox(
@@ -1066,7 +1223,8 @@ class _AddParamState extends State<AddParam> {
       ),
       actions: [
         isLoading
-            ? Center(child: CircularProgressIndicator()) // Show loading indicator
+            ? Center(
+                child: CircularProgressIndicator()) // Show loading indicator
             : TextButton(
                 onPressed: () {
                   if (isLoading) return; // Prevent further actions if loading
@@ -1117,5 +1275,5 @@ class _AddParamState extends State<AddParam> {
         isLoading = false; // Reset loading state
       });
     }
-  }  
+  }
 }

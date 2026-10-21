@@ -55,25 +55,6 @@ int compareStatus(String statusA, String statusB) {
   return indexA.compareTo(indexB);
 }
 
-Future<List> validLogin() async {
-  List users = [];
-  QuerySnapshot? queryUsers = await db.collection('Usuarios').get();
-  for (var doc in queryUsers.docs) {
-    final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    if (data['status'] != 'INACTIVO') {
-      final user = {
-        "uid": doc.id,
-        "name": data['name'],
-        "email": data['email'],
-        "status": data['status'],
-        "role": data['role'],
-      };
-      users.add(user);
-    }
-  }
-  return users;
-}
-
 Future<String> getFormState(String formId, String userId) async {  
   DocumentSnapshot formDoc = await FirebaseFirestore.instance.collection('Encuestas').doc(formId).collection('Usuarios').doc(userId).get();
 

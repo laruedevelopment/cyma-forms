@@ -11,7 +11,6 @@ import 'package:http/http.dart' as http;
 import 'dart:html' as html;
 import 'dart:js' as js;
 
-
 class MainMenu extends StatefulWidget {
   final String? role;
   final String? uid;
@@ -49,8 +48,10 @@ class _MainMenuState extends State<MainMenu> {
                 if (role != 'ADMINISTRADOR') ...[
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => ListUserForms(uid: uid))),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => ListUserForms(uid: uid))),
                     icon: const Icon(Icons.edit_note, size: 20),
                     label: const Text('RESPONDER ENCUESTA'),
                   ),
@@ -72,29 +73,41 @@ class _MainMenuState extends State<MainMenu> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => ListParameterScreen(param: 'Proyectos'))),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                ListParameterScreen(param: 'Proyectos'))),
                     icon: const Icon(Icons.business_center_outlined, size: 20),
                     label: const Text('ADMINISTRAR PROYECTOS'),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => ListParameterScreen(param: 'Actividades'))),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                ListParameterScreen(param: 'Actividades'))),
                     icon: const Icon(Icons.task_outlined, size: 20),
                     label: const Text('ADMINISTRAR ACTIVIDADES'),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => ListParameterScreen(param: 'Cargos'))),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                ListParameterScreen(param: 'Cargos'))),
                     icon: const Icon(Icons.work_outline, size: 20),
                     label: const Text('ADMINISTRAR CARGOS'),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => ListParameterScreen(param: 'Profesiones'))),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                ListParameterScreen(param: 'Profesiones'))),
                     icon: const Icon(Icons.school_outlined, size: 20),
                     label: const Text('ADMINISTRAR PROFESIONES'),
                   ),
@@ -117,60 +130,61 @@ class _MainMenuState extends State<MainMenu> {
   }
 
   static const String clientId = '1000.LJ685O4V2A3WG4C5KVHJL1HC12J54S';
-  static const String clientSecret = 'b9bc37b1794fb1ade28605387d665fa7a515199685';
+  static const String clientSecret =
+      'b9bc37b1794fb1ade28605387d665fa7a515199685';
   static const String scope = 'ZohoMail.messages.CREATE';
-  static const String redirectUri = 'https://cyma-encuestasmop.github.io/EncuestasMOP/';
+  static const String redirectUri =
+      'https://cyma-encuestasmop.github.io/EncuestasMOP/';
   static const String accountId = '855887768';
 
   Future<String> getAccessToken() async {
-  try {
-    const authorizationUrl = 'https://accounts.zoho.com/oauth/v2/auth'
-        '?scope=$scope'
-        '&client_id=$clientId'
-        '&response_type=code'
-        '&access_type=offline'
-        '&redirect_uri=$redirectUri';
+    try {
+      const authorizationUrl = 'https://accounts.zoho.com/oauth/v2/auth'
+          '?scope=$scope'
+          '&client_id=$clientId'
+          '&response_type=code'
+          '&access_type=offline'
+          '&redirect_uri=$redirectUri';
 
-    // Open the URL in a new tab/window
-    js.context.callMethod('open', [authorizationUrl, '_blank']);
+      // Open the URL in a new tab/window
+      js.context.callMethod('open', [authorizationUrl, '_blank']);
 
-    // Use Completer to handle the asynchronous nature of window.onMessage
-    final completer = Completer<String>();
-    html.window.onMessage.listen((html.MessageEvent event) {
-      if (event.data.toString().contains('code=')) {
-        final authCode = Uri.parse(event.data.toString()).queryParameters['code'];
-        if (authCode != null) {
-          completer.complete(authCode);
-        } else {
-          completer.completeError('Authorization code not found in callback.');
+      // Use Completer to handle the asynchronous nature of window.onMessage
+      final completer = Completer<String>();
+      html.window.onMessage.listen((html.MessageEvent event) {
+        if (event.data.toString().contains('code=')) {
+          final authCode =
+              Uri.parse(event.data.toString()).queryParameters['code'];
+          if (authCode != null) {
+            completer.complete(authCode);
+          } else {
+            completer
+                .completeError('Authorization code not found in callback.');
+          }
         }
-      }
-    });
+      });
 
-    final code = await completer.future;
+      final code = await completer.future;
 
-    const tokenUrl = 'https://accounts.zoho.com/oauth/v2/token';
-    final response = await http.post(
-      Uri.parse(tokenUrl),
-      body: {
-        'grant_type': 'authorization_code',
-        'client_id': clientId,
-        'client_secret': clientSecret,
-        'redirect_uri': redirectUri,
-        'code': code,
-      },
-    );
+      const tokenUrl = 'https://accounts.zoho.com/oauth/v2/token';
+      final response = await http.post(
+        Uri.parse(tokenUrl),
+        body: {
+          'grant_type': 'authorization_code',
+          'client_id': clientId,
+          'client_secret': clientSecret,
+          'redirect_uri': redirectUri,
+          'code': code,
+        },
+      );
 
-    final accessToken = jsonDecode(response.body)['access_token'];
-    print('Access Token: $accessToken');
-    return accessToken;
-  } catch (e) {
-    print('Error in authentication: $e');
-    throw Exception('Failed to authenticate with Zoho: $e');
+      final accessToken = jsonDecode(response.body)['access_token'];
+      return accessToken;
+    } catch (e) {
+      print('Error in authentication: $e');
+      throw Exception('Failed to authenticate with Zoho: $e');
+    }
   }
-}
-
-
 
   Future<void> sendZohoEmail({
     required String accessToken,
@@ -182,7 +196,8 @@ class _MainMenuState extends State<MainMenu> {
     required String content,
     String? askReceipt,
   }) async {
-    final url = Uri.parse('https://mail.zoho.com/api/accounts/$accountId/messages');
+    final url =
+        Uri.parse('https://mail.zoho.com/api/accounts/$accountId/messages');
 
     final headers = {
       'Accept': 'application/json',
@@ -216,8 +231,7 @@ class _MainMenuState extends State<MainMenu> {
 
   Future<void> sendEmail() async {
     final url = Uri.parse(
-      'https://v1.nocodeapi.com/javirueda7/zohomail/uQtvnhGfyoZKOpeY/sendEmail?fromAddress=javieruedase@zohomail.com&toAddress=thebucaracrew@gmail.com,javieruedase@gmail.com,javier.rueda7@outlook.com&content=contenido&subject=tema'
-    );
+        'https://v1.nocodeapi.com/javirueda7/zohomail/uQtvnhGfyoZKOpeY/sendEmail?fromAddress=javieruedase@zohomail.com&toAddress=thebucaracrew@gmail.com,javieruedase@gmail.com,javier.rueda7@outlook.com&content=contenido&subject=tema');
 
     final headers = {
       'Content-Type': 'application/json',
@@ -232,4 +246,3 @@ class _MainMenuState extends State<MainMenu> {
     }
   }
 }
-

@@ -41,3 +41,22 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Build web antiguo en la raíz (el despliegue compila desde web/)
+/canvaskit/
+/favicon.png
+/flutter.js
+/flutter_service_worker.js
+/icons/
+/index.html
+/main.dart.js
+/manifest.json
+/version.json
+/.last_build_id
+/assets/AssetManifest.*
+/assets/FontManifest.json
+/assets/NOTICES
+/assets/assets/
+/assets/fonts/
+/assets/packages/
+/assets/shaders/

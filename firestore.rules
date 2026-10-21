@@ -1,0 +1,98 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/Usuarios/$(uid));
+    }
+
+    function myData() {
+      return userDoc(request.auth.uid).data;
+    }
+
+    function hasActiveUser() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/Usuarios/$(request.auth.uid))
+        && myData().status == 'ACTIVO';
+    }
+
+    // MASTER y ADMINISTRADOR administran; CONSULTOR solo lee.
+    function isAdmin() {
+      return hasActiveUser() && myData().role in ['MASTER', 'ADMINISTRADOR'];
+    }
+
+    function isMaster() {
+      return hasActiveUser() && myData().role == 'MASTER';
+    }
+
+    function isStaff() {
+      return hasActiveUser() && myData().role in ['MASTER', 'ADMINISTRADOR', 'CONSULTOR'];
+    }
+
+    // Solo un MASTER puede crear, editar o degradar cuentas MASTER.
+    function masterRoleOk() {
+      return (!('role' in request.resource.data) || request.resource.data.role != 'MASTER' || isMaster())
+        && (resource == null || resource.data.role != 'MASTER' || isMaster());
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Usuarios: cada persona ve y edita lo suyo; los administradores todo.
+    // El registro público solo puede crear el rol USUARIO.
+    match /Usuarios/{uid} {
+      allow get: if isSelf(uid) || isStaff();
+      allow list: if isStaff();
+      allow create: if (isAdmin() && masterRoleOk())
+        || (isSelf(uid) && request.resource.data.role == 'USUARIO');
+      allow update: if (isAdmin() && masterRoleOk())
+        || (isSelf(uid)
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['role', 'status', 'email']));
+      allow delete: if isAdmin() && (resource.data.role != 'MASTER' || isMaster());
+    }
+
+    // Cargos y Profesiones se leen en el registro público (antes de iniciar sesión).
+    match /Cargos/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /Profesiones/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Proyectos y actividades: los usuarios pueden proponer nuevos (PENDIENTE).
+    match /{catalog}/{id} {
+      allow read: if signedIn() && catalog in ['Proyectos', 'Actividades'];
+      allow create: if catalog in ['Proyectos', 'Actividades']
+        && (isAdmin()
+            || (signedIn() && request.resource.data.status == 'PENDIENTE'));
+      allow update, delete: if catalog in ['Proyectos', 'Actividades'] && isAdmin();
+    }
+
+    // Encuestas: lectura para usuarios autenticados, escritura solo admin.
+    match /Encuestas/{encuestaId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+
+      // Respuesta de cada persona a la encuesta.
+      match /Usuarios/{uid} {
+        allow read: if isSelf(uid) || isStaff();
+        // Alta al registrarse: solo su propio documento, abierto.
+        allow create: if isAdmin()
+          || (isSelf(uid) && request.resource.data.status == 'ABIERTA');
+        // Una persona edita lo suyo hasta que lo envía; después solo el admin.
+        allow update: if isAdmin()
+          || (isSelf(uid) && resource.data.status != 'ENVIADA');
+        allow delete: if isAdmin();
+      }
+    }
+  }
+}

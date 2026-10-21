@@ -16,18 +16,6 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
-  List users = [];
-
-  void obtainUsersList() async {
-    users = await validLogin();
-  }
-  
-  @override
-  void initState() {
-    super.initState();
-    obtainUsersList();
-  }
-
   void _reloadList() {
     setState(() {}); // Empty setState just to trigger rebuild
   }
@@ -96,51 +84,43 @@ class _SignInPageState extends State<SignInPage> {
                     ),
                     Container(
                         constraints: const BoxConstraints(maxWidth: 800),
-                        child: firebaseButton(context, "INICIAR SESIÓN", () {
-                          final email = _emailTextController.text;
-                          final password = _passwordTextcontroller.text;
-                          final userWithEmail = users.firstWhere(
-                            (user) => user['email'] == email,
-                            orElse: () => null,
-                          );
-                          if (userWithEmail != null &&
-                                  userWithEmail['status'] == 'ACTIVO') {
-                          String rol = userWithEmail['role'];
-                                    print(2);
-                            // Allow login
-                            FirebaseAuth.instance
-                                .signInWithEmailAndPassword(
-                                    email: email, password: password)
-                                .then((value) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Bienvenid@ ${userWithEmail['name']}, inicio de sesión satisfactorio.', style: TextStyle(color: Colors.black)),
-                                  duration: Duration(seconds: 4),
-                                  backgroundColor: Color.fromRGBO(52, 194, 64, 1),
-                                ),
-                              );
-                              Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) => MainMenu(role: rol, uid: userWithEmail['uid'])));
-                            // ignore: sdk_version_since
-                            }).onError((error, stackTrace) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Tus datos no coinciden con nuestra información, verifícalos o crea una cuenta.', style: TextStyle(color: Colors.white),),
-                                  duration: Duration(seconds: 4),
-                                  backgroundColor: Color.fromRGBO(214, 66, 66, 1),
-                                ),
-                              );
-                            });
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                        child: firebaseButton(context, "INICIAR SESIÓN", () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          void showError() {
+                            messenger.showSnackBar(
                               SnackBar(
                                 content: Text('Tus datos no coinciden con nuestra información, verifícalos o crea una cuenta.', style: TextStyle(color: Colors.white),),
                                 duration: Duration(seconds: 4),
                                 backgroundColor: Color.fromRGBO(214, 66, 66, 1),
                               ),
                             );
+                          }
+
+                          try {
+                            final credential = await FirebaseAuth.instance
+                                .signInWithEmailAndPassword(
+                                    email: _emailTextController.text.trim(),
+                                    password: _passwordTextcontroller.text);
+                            final uid = credential.user!.uid;
+                            final userData = await fetchUserData(uid);
+                            if (userData == null || userData['status'] != 'ACTIVO') {
+                              await FirebaseAuth.instance.signOut();
+                              showError();
+                              return;
+                            }
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Bienvenid@ ${userData['name']}, inicio de sesión satisfactorio.', style: TextStyle(color: Colors.black)),
+                                duration: Duration(seconds: 4),
+                                backgroundColor: Color.fromRGBO(52, 194, 64, 1),
+                              ),
+                            );
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => MainMenu(role: userData['role'], uid: uid)));
+                          } catch (_) {
+                            showError();
                           }
                         })),
                     Container(

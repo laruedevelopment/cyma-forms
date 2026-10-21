@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:forms_app/services/firebase_services.dart';
+import 'package:forms_app/services/hours_utils.dart';
 import 'package:forms_app/widgets/forms_widgets.dart';
 
 class AddEditForm extends StatefulWidget {
@@ -38,7 +39,8 @@ class _AddEditFormState extends State<AddEditForm> {
   late TextEditingController startDateController;
   late TextEditingController endDateController;
   late TextEditingController daysController;
-  final CollectionReference encuestas = FirebaseFirestore.instance.collection('Encuestas');
+  final CollectionReference encuestas =
+      FirebaseFirestore.instance.collection('Encuestas');
 
   List<Map<String, dynamic>> activeUsers = [];
   List<bool> userSelection = [];
@@ -69,14 +71,18 @@ class _AddEditFormState extends State<AddEditForm> {
         endDateController.text = widget.endDate ?? '';
         daysController.text = widget.days ?? '';
         selectedStatus = widget.status ?? 'CREADA';
-        statuses = widget.status == 'ACTIVA' || widget.status == 'CERRADA' ? ['ACTIVA', 'CERRADA'] : ['CREADA', 'ACTIVA', 'CERRADA'];
-        activarEncuesta = widget.status == 'ACTIVA' || widget.status == 'CERRADA' ?  true : false;
+        statuses = widget.status == 'ACTIVA' || widget.status == 'CERRADA'
+            ? ['ACTIVA', 'CERRADA']
+            : ['CREADA', 'ACTIVA', 'CERRADA'];
+        activarEncuesta =
+            widget.status == 'ACTIVA' || widget.status == 'CERRADA'
+                ? true
+                : false;
         if (widget.hours != null && widget.hours!.isNotEmpty) {
           hoursController.text = widget.hours!;
         } else {
-          int horas = (int.parse(daysController.text) * 9) - 3;
-          if (horas < 0) horas = 0;
-          hoursController.text = horas.toString();
+          hoursController.text =
+              calcularHorasEsperadas(daysController.text).toString();
         }
       });
     } else {
@@ -89,19 +95,19 @@ class _AddEditFormState extends State<AddEditForm> {
   Future<void> _loadActiveUsers() async {
     try {
       Query activeUsersQuery = FirebaseFirestore.instance
-        .collection('Usuarios')
-        .orderBy('name') // Order by 'name' field from A to Z
-        .where('status', isEqualTo: 'ACTIVO')
-        .where('role', isEqualTo: 'USUARIO');
+          .collection('Usuarios')
+          .orderBy('name') // Order by 'name' field from A to Z
+          .where('status', isEqualTo: 'ACTIVO')
+          .where('role', isEqualTo: 'USUARIO');
 
       if (widget.tipo == 'T') {
         // No additional filters needed
       } else if (widget.tipo == 'U') {
-        activeUsersQuery = activeUsersQuery
-          .where('position', isNotEqualTo: 'CG0007');
+        activeUsersQuery =
+            activeUsersQuery.where('position', isNotEqualTo: 'CG0007');
       } else if (widget.tipo == 'G') {
-        activeUsersQuery = activeUsersQuery
-          .where('position', isEqualTo: 'CG0007');
+        activeUsersQuery =
+            activeUsersQuery.where('position', isEqualTo: 'CG0007');
       }
 
       try {
@@ -110,12 +116,13 @@ class _AddEditFormState extends State<AddEditForm> {
         print('Error getting active users: $e');
       }
 
-
       Map<String, String> positionNames = {};
       Map<String, String> professionNames = {};
 
-      final CollectionReference positions = FirebaseFirestore.instance.collection('Cargos');
-      final CollectionReference professions = FirebaseFirestore.instance.collection('Profesiones');
+      final CollectionReference positions =
+          FirebaseFirestore.instance.collection('Cargos');
+      final CollectionReference professions =
+          FirebaseFirestore.instance.collection('Profesiones');
       final positionQuery = positions.get();
       final professionQuery = professions.get();
       final results = await Future.wait([positionQuery, professionQuery]);
@@ -125,11 +132,15 @@ class _AddEditFormState extends State<AddEditForm> {
 
       positionNames = {
         for (var document in positionDocs)
-          document.id: (document.data() as Map<String, dynamic>)['name'] as String? ?? 'Unknown Position'
+          document.id:
+              (document.data() as Map<String, dynamic>)['name'] as String? ??
+                  'Unknown Position'
       };
       professionNames = {
         for (var document in professionDocs)
-          document.id: (document.data() as Map<String, dynamic>)['name'] as String? ?? 'Unknown Profession'
+          document.id:
+              (document.data() as Map<String, dynamic>)['name'] as String? ??
+                  'Unknown Profession'
       };
 
       setState(() {
@@ -141,8 +152,10 @@ class _AddEditFormState extends State<AddEditForm> {
             data['status'] = 'NO ASIGNADA';
           }
 
-          String positionName = positionNames[data['position']] ?? 'Unknown Position';
-          String professionName = professionNames[data['profession']] ?? 'Unknown Profession';
+          String positionName =
+              positionNames[data['position']] ?? 'Unknown Position';
+          String professionName =
+              professionNames[data['profession']] ?? 'Unknown Profession';
 
           data['positionName'] = positionName;
           data['professionName'] = professionName;
@@ -152,17 +165,18 @@ class _AddEditFormState extends State<AddEditForm> {
         }).toList();
 
         userSelection = List<bool>.filled(activeUsers.length, false);
-        preloadedSelection = List<bool>.filled(activeUsers.length, false); // Initialize preloadedSelection
+        preloadedSelection = List<bool>.filled(
+            activeUsers.length, false); // Initialize preloadedSelection
 
         if (widget.id != null) {
           _loadSelectedUsers(widget.id!);
-          if (preloadedSelection.length == activeUsers.length){
+          if (preloadedSelection.length == activeUsers.length) {
             selectAll = true;
           }
         } else {
           userSelection = List<bool>.filled(activeUsers.length, false);
         }
-    });
+      });
     } catch (e) {
       print('Error loading active users: $e');
       // Handle the error, e.g., show a Snackbar or an alert
@@ -175,7 +189,8 @@ class _AddEditFormState extends State<AddEditForm> {
         .doc(id)
         .collection('Usuarios')
         .get();
-    var selectedUsersIds = selectedUsersSnapshot.docs.map((doc) => doc.id).toList();
+    var selectedUsersIds =
+        selectedUsersSnapshot.docs.map((doc) => doc.id).toList();
 
     setState(() {
       for (int i = 0; i < activeUsers.length; i++) {
@@ -188,7 +203,8 @@ class _AddEditFormState extends State<AddEditForm> {
         }
       }
     });
-    if (preloadedSelection.where((element) => element).length == activeUsers.length) {
+    if (preloadedSelection.where((element) => element).length ==
+        activeUsers.length) {
       selectAll = true;
     } else {
       selectAll = false;
@@ -205,7 +221,9 @@ class _AddEditFormState extends State<AddEditForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Center(child: Text(widget.id != null ? 'EDITAR ENCUESTA' : 'AGREGAR ENCUESTA')),
+        title: Center(
+            child: Text(
+                widget.id != null ? 'EDITAR ENCUESTA' : 'AGREGAR ENCUESTA')),
       ),
       body: Stack(
         children: [
@@ -220,9 +238,13 @@ class _AddEditFormState extends State<AddEditForm> {
                   SizedBox(height: 10),
                   Row(
                     children: [
-                      Expanded(child: buildDateField('FECHA DE INICIO', startDateController, context)),
+                      Expanded(
+                          child: buildDateField(
+                              'FECHA DE INICIO', startDateController, context)),
                       SizedBox(width: 10),
-                      Expanded(child: buildDateField('FECHA DE FINALIZACIÓN', endDateController, context)),
+                      Expanded(
+                          child: buildDateField('FECHA DE FINALIZACIÓN',
+                              endDateController, context)),
                     ],
                   ),
                   SizedBox(height: 10),
@@ -241,43 +263,47 @@ class _AddEditFormState extends State<AddEditForm> {
                             decoration: InputDecoration(
                               labelText: 'DÍAS HÁBILES',
                               border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 16.0, vertical: 12.0),
                             ),
                             onChanged: (value) {
-                              int horas = (int.parse(value) * 9) - 3;
-                              if (horas < 0) horas = 0;
-                              hoursController.text = horas.toString();
+                              hoursController.text =
+                                  calcularHorasEsperadas(value).toString();
                             },
                           ),
                         ),
                       ),
                       SizedBox(width: 10),
                       Expanded(
-                        child: buildTextField('HORAS ESPERADAS', hoursController, false),
+                        child: buildTextField(
+                            'HORAS ESPERADAS', hoursController, true),
                       ),
                       SizedBox(width: 10),
                       Expanded(
-                        child: buildDropdownField(
-                          'ESTADO',
-                          statuses,
-                          (value) {
-                            setState(() {
-                              selectedStatus = value ?? 'CREADA';
-                            });
-                          },
-                          initialValue: selectedStatus, allowChange: widget.id == null || widget.status == 'CREADA' ? false : true
-                        ),
+                        child: buildDropdownField('ESTADO', statuses, (value) {
+                          setState(() {
+                            selectedStatus = value ?? 'CREADA';
+                          });
+                        },
+                            initialValue: selectedStatus,
+                            allowChange:
+                                widget.id == null || widget.status == 'CREADA'
+                                    ? false
+                                    : true),
                       ),
                       Expanded(
                         child: Row(
                           children: [
                             Checkbox(
                               value: activarEncuesta,
-                              onChanged: widget.status == 'CREADA' || widget.status == null ? (bool? value) {
-                                setState(() {
-                                  activarEncuesta = value ?? false;
-                                });
-                              } : null,
+                              onChanged: widget.status == 'CREADA' ||
+                                      widget.status == null
+                                  ? (bool? value) {
+                                      setState(() {
+                                        activarEncuesta = value ?? false;
+                                      });
+                                    }
+                                  : null,
                             ),
                             Text('ACTIVAR ENCUESTA'),
                           ],
@@ -341,23 +367,27 @@ class _AddEditFormState extends State<AddEditForm> {
                         children: [
                           Text('SELECCIONAR TODOS'),
                           Checkbox(
-                          value: selectAll,
-                          onChanged: (bool? value) {
-                            setState(() {
-                              selectAll = value ?? false;
-                              userSelection = List<bool>.filled(activeUsers.length, selectAll);
-                              selectedUsers.clear(); // Clear the selected users list
-                              if (selectAll) {
-                                // If "Select All" is checked, add all user IDs to the list
-                                selectedUsers.addAll(activeUsers
-                                  .where((user) => user.containsKey('userId') && user['userId'] != null)
-                                  .map((user) => user['userId']!));
-                                // Also add all emails to the list
-                                print(activeUsers);
-                                print(selectedUsers);
-                              }
-                            });
-                          }),
+                              value: selectAll,
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  selectAll = value ?? false;
+                                  userSelection = List<bool>.filled(
+                                      activeUsers.length, selectAll);
+                                  selectedUsers
+                                      .clear(); // Clear the selected users list
+                                  if (selectAll) {
+                                    // If "Select All" is checked, add all user IDs to the list
+                                    selectedUsers.addAll(activeUsers
+                                        .where((user) =>
+                                            user.containsKey('userId') &&
+                                            user['userId'] != null)
+                                        .map((user) => user['userId']!));
+                                    // Also add all emails to the list
+                                    print(activeUsers);
+                                    print(selectedUsers);
+                                  }
+                                });
+                              }),
                         ],
                       ),
                     ),
@@ -372,33 +402,46 @@ class _AddEditFormState extends State<AddEditForm> {
                         itemCount: activeUsers.length,
                         itemBuilder: (context, index) {
                           var user = activeUsers[index];
-                          var userId = activeUsersSnapshot.docs[index].id;                
+                          var userId = activeUsersSnapshot.docs[index].id;
                           return Column(
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Expanded(flex: 4, child: Text(user['name'] ?? '')),
-                                  Expanded(flex: 4, child: Text(user['professionName'])),
-                                  Expanded(flex: 4, child: Text(user['positionName'])),
-                                  Expanded(flex: 4, child: Text(user['sede'] ?? '')),
-                                  Expanded(flex: 1, child: Text(user['status'] ?? 'NO ASIGNADA')),
+                                  Expanded(
+                                      flex: 4, child: Text(user['name'] ?? '')),
+                                  Expanded(
+                                      flex: 4,
+                                      child: Text(user['professionName'])),
+                                  Expanded(
+                                      flex: 4,
+                                      child: Text(user['positionName'])),
+                                  Expanded(
+                                      flex: 4, child: Text(user['sede'] ?? '')),
+                                  Expanded(
+                                      flex: 1,
+                                      child: Text(
+                                          user['status'] ?? 'NO ASIGNADA')),
                                   Expanded(
                                     flex: 1,
                                     child: Checkbox(
-                                        value: userSelection[index],
-                                        onChanged: selectedStatus == 'CERRADA' || (preloadedSelection[index] && selectedStatus != 'CREADA') 
-                                            ? null // Disable the checkbox if status is 'CERRADA' or if it was preloaded selected
-                                            : (bool? selected) {
-                                                setState(() {
-                                                    userSelection[index] = selected!;
-                                                    if (selected) {
-                                                        selectedUsers.add(userId);
-                                                    } else {
-                                                        selectedUsers.remove(userId);
-                                                    }
-                                                  _updateSelectAll();
-                                                });
+                                      value: userSelection[index],
+                                      onChanged: selectedStatus == 'CERRADA' ||
+                                              (preloadedSelection[index] &&
+                                                  selectedStatus != 'CREADA')
+                                          ? null // Disable the checkbox if status is 'CERRADA' or if it was preloaded selected
+                                          : (bool? selected) {
+                                              setState(() {
+                                                userSelection[index] =
+                                                    selected!;
+                                                if (selected) {
+                                                  selectedUsers.add(userId);
+                                                } else {
+                                                  selectedUsers.remove(userId);
+                                                }
+                                                _updateSelectAll();
+                                              });
                                             },
                                     ),
                                   ),
@@ -414,16 +457,26 @@ class _AddEditFormState extends State<AddEditForm> {
                   SizedBox(height: 30),
                   SizedBox(height: 10),
                   ElevatedButton(
-                    onPressed: isLoading ? null : () {
-                      _saveOrEditSurvey();
-                    },
-                    child: Text((activarEncuesta && widget.status != 'CREADA') ? (selectedStatus == 'CERRADA' ? (widget.status != selectedStatus ? 'CERRAR ENCUESTA' : 'GUARDAR CAMBIOS ENCUESTA CERRADA') : (widget.status != selectedStatus ? 'ACTIVAR ENCUESTA' : 'GUARDAR CAMBIOS ENCUESTA ACTIVA')) : 'GUARDAR CAMBIOS ENCUESTA'),
+                    onPressed: isLoading
+                        ? null
+                        : () {
+                            _saveOrEditSurvey();
+                          },
+                    child: Text((activarEncuesta && widget.status != 'CREADA')
+                        ? (selectedStatus == 'CERRADA'
+                            ? (widget.status != selectedStatus
+                                ? 'CERRAR ENCUESTA'
+                                : 'GUARDAR CAMBIOS ENCUESTA CERRADA')
+                            : (widget.status != selectedStatus
+                                ? 'ACTIVAR ENCUESTA'
+                                : 'GUARDAR CAMBIOS ENCUESTA ACTIVA'))
+                        : 'GUARDAR CAMBIOS ENCUESTA'),
                   ),
                 ],
               ),
             ),
           ),
-          if (isLoading) 
+          if (isLoading)
             Center(
               child: CircularProgressIndicator(),
             ),
@@ -431,7 +484,6 @@ class _AddEditFormState extends State<AddEditForm> {
       ),
     );
   }
-
 
   bool _validateForm() {
     if (nameController.text.isEmpty ||
@@ -461,7 +513,7 @@ class _AddEditFormState extends State<AddEditForm> {
 
     if (querySnapshot.docs.isNotEmpty) {
       bool shouldSkip = false;
-      
+
       // Iterate through the documents to check if doc.id matches id.widget
       for (var doc in querySnapshot.docs) {
         if (widget.id != null && doc.id == widget.id) {
@@ -485,7 +537,6 @@ class _AddEditFormState extends State<AddEditForm> {
       }
     }
 
-
     setState(() {
       isLoading = true; // Set loading state to true
     });
@@ -499,7 +550,8 @@ class _AddEditFormState extends State<AddEditForm> {
       } else {
         if (selectedUsers.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('POR FAVOR, SELECCIONE AL MENOS UN USUARIO')),
+            SnackBar(
+                content: Text('POR FAVOR, SELECCIONE AL MENOS UN USUARIO')),
           );
           return;
         }
@@ -523,11 +575,10 @@ class _AddEditFormState extends State<AddEditForm> {
     }
   }
 
-
-
   Future<void> _addSurvey() async {
     String id = await idGenerator(encuestas, 'Encuestas');
-    var newSurveyDoc = FirebaseFirestore.instance.collection('Encuestas').doc(id);
+    var newSurveyDoc =
+        FirebaseFirestore.instance.collection('Encuestas').doc(id);
     await newSurveyDoc.set({
       'name': nameController.text,
       'startDate': startDateController.text,
@@ -539,7 +590,12 @@ class _AddEditFormState extends State<AddEditForm> {
     });
 
     // Retrieve the selected user IDs
-    List<String> selectedUserIds = userSelection.asMap().entries.where((entry) => entry.value).map((entry) => activeUsersSnapshot.docs[entry.key].id).toList();
+    List<String> selectedUserIds = userSelection
+        .asMap()
+        .entries
+        .where((entry) => entry.value)
+        .map((entry) => activeUsersSnapshot.docs[entry.key].id)
+        .toList();
 
     for (var userId in selectedUserIds) {
       await newSurveyDoc.collection('Usuarios').doc(userId).set({
@@ -548,9 +604,9 @@ class _AddEditFormState extends State<AddEditForm> {
     }
   }
 
-
   Future<void> _updateSurvey() async {
-    var surveyDoc = FirebaseFirestore.instance.collection('Encuestas').doc(widget.id);
+    var surveyDoc =
+        FirebaseFirestore.instance.collection('Encuestas').doc(widget.id);
 
     try {
       // Update the main survey document
@@ -559,7 +615,9 @@ class _AddEditFormState extends State<AddEditForm> {
         'startDate': startDateController.text,
         'endDate': endDateController.text,
         'days': daysController.text,
-        'status': activarEncuesta == true && widget.status == 'CREADA' ? 'ACTIVA' : selectedStatus,
+        'status': activarEncuesta == true && widget.status == 'CREADA'
+            ? 'ACTIVA'
+            : selectedStatus,
         'hours': hoursController.text,
       });
 
@@ -584,5 +642,4 @@ class _AddEditFormState extends State<AddEditForm> {
       print('Failed to update survey: $e');
     }
   }
-
 }

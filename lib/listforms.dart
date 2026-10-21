@@ -1,7 +1,4 @@
-
 // ignore_for_file: use_build_context_synchronously
-
-import 'dart:math';
 
 import 'package:forms_app/form.dart';
 import 'package:http/http.dart' as http;
@@ -9,9 +6,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:forms_app/addeditforms.dart';
 import 'package:forms_app/services/firebase_services.dart';
+import 'package:forms_app/services/hours_utils.dart';
 import 'package:forms_app/widgets/forms_widgets.dart';
-class ListFormsScreen extends StatefulWidget {
 
+class ListFormsScreen extends StatefulWidget {
   ListFormsScreen({super.key});
 
   @override
@@ -20,7 +18,6 @@ class ListFormsScreen extends StatefulWidget {
 }
 
 class _ListFormsScreenState extends State<ListFormsScreen> {
-
   void _reloadList() {
     setState(() {}); // Empty setState just to trigger rebuild
   }
@@ -67,112 +64,143 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                       itemBuilder: (context, index) {
                         final item = snapshot.data?[index];
                         return SizedBox(
-                          height: 100, // Adjust height as necessary
-                          child: GestureDetector(
-                            child: Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(10.0),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      item?['id'] ?? '',
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                    ),
-                                    SizedBox(width: 20),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.center,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(item?['data']['name'] ?? '',
-                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                          Text(
-                                              '${item?['data']['startDate']} - ${item?['data']['endDate']}', style: TextStyle(fontSize: 15),),
-                                        ],
+                            height: 100, // Adjust height as necessary
+                            child: GestureDetector(
+                              child: Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(10.0),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        item?['id'] ?? '',
+                                        style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold),
                                       ),
-                                    ),
-                                    SizedBox(width: 20),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          statusChip(item?['data']['status'] ?? ''),
-                                          Text(
-                                            'USUARIOS ASOCIADOS: ${item?['usuariosTotal'] ?? ''}',
-                                            style: TextStyle(fontSize: 14),
-                                          ),
-                                          Text(
-                                            'USUARIOS POR RESPONDER: ${item?['usuariosNonEnviada'] ?? ''}',
-                                            style: TextStyle(fontSize: 14),
-                                          ),
-                                        ],
+                                      SizedBox(width: 20),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(item?['data']['name'] ?? '',
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16)),
+                                            Text(
+                                              '${item?['data']['startDate']} - ${item?['data']['endDate']}',
+                                              style: TextStyle(fontSize: 15),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                    SizedBox(width: 8),
-                                    IconButton(
-                                      onPressed: () {
-                                        String dates = item?['data']['startDate'] + ' - ' + item?['data']['endDate'];
-                                        String hours = max((int.parse(item?['data']['days']) * 9) - 1, 0).toString();
-                                        _loadAndShowUsers(context, item?['id'], item?['data']['name'] ?? '', dates, hours, item?['data']['status']);
-                                      },
-                                      icon: Icon(Icons.remove_red_eye_outlined, color: Colors.blue),
-                                    ),
-                                    Visibility(
-                                      visible: true,
-                                      child: IconButton(
+                                      SizedBox(width: 20),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            statusChip(
+                                                item?['data']['status'] ?? ''),
+                                            Text(
+                                              'USUARIOS ASOCIADOS: ${item?['usuariosTotal'] ?? ''}',
+                                              style: TextStyle(fontSize: 14),
+                                            ),
+                                            Text(
+                                              'USUARIOS POR RESPONDER: ${item?['usuariosNonEnviada'] ?? ''}',
+                                              style: TextStyle(fontSize: 14),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      IconButton(
+                                        onPressed: () {
+                                          String dates = item?['data']
+                                                  ['startDate'] +
+                                              ' - ' +
+                                              item?['data']['endDate'];
+                                          String hours =
+                                              horasEsperadasDe(item?['data']);
+                                          _loadAndShowUsers(
+                                              context,
+                                              item?['id'],
+                                              item?['data']['name'] ?? '',
+                                              dates,
+                                              hours,
+                                              item?['data']['status']);
+                                        },
+                                        icon: Icon(
+                                            Icons.remove_red_eye_outlined,
+                                            color: Colors.blue),
+                                      ),
+                                      Visibility(
+                                        visible: true,
+                                        child: IconButton(
+                                          onPressed: () {
+                                            if (item != null &&
+                                                item.containsKey('id') &&
+                                                item['data']['status'] ==
+                                                    'ACTIVA') {
+                                              confirmacionEmail(
+                                                  context,
+                                                  item['id'],
+                                                  item['data']['name']);
+                                            }
+                                          },
+                                          icon: Icon(Icons.email_outlined,
+                                              color: item?['data']['status'] ==
+                                                      'ACTIVA'
+                                                  ? Colors.green
+                                                  : Colors.grey),
+                                        ),
+                                      ),
+                                      IconButton(
                                         onPressed: () {
                                           if (item != null &&
                                               item.containsKey('id') &&
-                                              item['data']['status'] == 'ACTIVA') {
-                                            confirmacionEmail(context, item['id'], item['data']['name']);
+                                              item['data']['status'] ==
+                                                  'CREADA') {
+                                            mostrarDialogoConfirmacion(
+                                                context, item['id']);
+                                          } else {
+                                            print(
+                                                'Error: ID del documento no disponible');
                                           }
                                         },
-                                        icon: Icon(Icons.email_outlined,
-                                            color: item?['data']['status'] == 'ACTIVA'
-                                                ? Colors.green
+                                        icon: Icon(
+                                            Icons.delete_outline_outlined,
+                                            color: item?['data']['status'] ==
+                                                    'CREADA'
+                                                ? Colors.red
                                                 : Colors.grey),
                                       ),
-                                    ),                                    
-                                    IconButton(
-                                      onPressed: () {
-                                        if (item != null &&
-                                            item.containsKey('id') &&
-                                            item['data']['status'] == 'CREADA') {
-                                          mostrarDialogoConfirmacion(context, item['id']);
-                                        } else {
-                                          print('Error: ID del documento no disponible');
-                                        }
-                                      },
-                                      icon: Icon(Icons.delete_outline_outlined,
-                                          color: item?['data']['status'] == 'CREADA'
-                                              ? Colors.red
-                                              : Colors.grey),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                            onTap: (){ 
-                              showDialog(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return AddEditForm(
-                                    reloadList: _reloadList,
-                                    id: item?['id'],
-                                    name: item?['data']['name'],
-                                    startDate: item?['data']['startDate'],
-                                    endDate: item?['data']['endDate'],
-                                    days: item?['data']['days'],
-                                    status: item?['data']['status'],
-                                    hours: item?['data']['hours'],
-                                    tipo: item?['data']['tipo'],
-                                  );
-                                }
-                              );
-                            },
-                          )
-                        );
+                              onTap: () {
+                                showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return AddEditForm(
+                                        reloadList: _reloadList,
+                                        id: item?['id'],
+                                        name: item?['data']['name'],
+                                        startDate: item?['data']['startDate'],
+                                        endDate: item?['data']['endDate'],
+                                        days: item?['data']['days'],
+                                        status: item?['data']['status'],
+                                        hours: item?['data']['hours'],
+                                        tipo: item?['data']['tipo'],
+                                      );
+                                    });
+                              },
+                            ));
                       },
                     );
                   } else {
@@ -209,7 +237,11 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                 Navigator.of(context).pop();
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => AddEditForm(tipo: 'G', reloadList: _reloadList,)), // Navigate to the NewUserPage
+                  MaterialPageRoute(
+                      builder: (context) => AddEditForm(
+                            tipo: 'G',
+                            reloadList: _reloadList,
+                          )), // Navigate to the NewUserPage
                 );
               },
             ),
@@ -219,7 +251,11 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                 Navigator.of(context).pop();
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => AddEditForm(tipo: 'U', reloadList: _reloadList,)), // Navigate to the NewUserPage
+                  MaterialPageRoute(
+                      builder: (context) => AddEditForm(
+                            tipo: 'U',
+                            reloadList: _reloadList,
+                          )), // Navigate to the NewUserPage
                 );
               },
             ),
@@ -229,7 +265,11 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                 Navigator.of(context).pop();
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => AddEditForm(tipo: 'T', reloadList: _reloadList,)), // Navigate to the NewUserPage
+                  MaterialPageRoute(
+                      builder: (context) => AddEditForm(
+                            tipo: 'T',
+                            reloadList: _reloadList,
+                          )), // Navigate to the NewUserPage
                 );
               },
             ),
@@ -257,7 +297,8 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
               child: Text('ELIMINAR'),
               onPressed: () async {
                 Navigator.of(context).pop(); // Cierra el diálogo
-                await eliminarItem(documentId); // Llama a la función de eliminación
+                await eliminarItem(
+                    documentId); // Llama a la función de eliminación
               },
             ),
           ],
@@ -268,12 +309,14 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
 
   Future<void> eliminarItem(String documentId) async {
     try {
-      await FirebaseFirestore.instance.collection('Encuestas').doc(documentId).update({
-        'status': 'ELIMINADA'
-      });
+      await FirebaseFirestore.instance
+          .collection('Encuestas')
+          .doc(documentId)
+          .update({'status': 'ELIMINADA'});
       print('Estado del documento actualizado a ELIMINADA con éxito');
-      
-      if (mounted) { // Verifica si el widget aún está montado
+
+      if (mounted) {
+        // Verifica si el widget aún está montado
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('ENCUESTA ELIMINADA SATISFACTORIAMENTE')),
         );
@@ -281,14 +324,14 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
       }
     } catch (e) {
       print('Error al actualizar el estado del documento: $e');
-      if (mounted) { // Verifica si el widget aún está montado
+      if (mounted) {
+        // Verifica si el widget aún está montado
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al eliminar el documento: $e')),
         );
       }
     }
   }
-
 
   Future<void> sendEmail(String id, String nameEncuesta, String body) async {
     final firestore = FirebaseFirestore.instance;
@@ -314,13 +357,13 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
       return null;
     }).toList();
 
-    final selectedEmails = (await Future.wait(futures))
-        .whereType<String>()
-        .toList();
+    final selectedEmails =
+        (await Future.wait(futures)).whereType<String>().toList();
 
     // Si no hay correos, no seguimos
     if (selectedEmails.isEmpty) {
-      print('No se encontraron correos electrónicos para los usuarios seleccionados.');
+      print(
+          'No se encontraron correos electrónicos para los usuarios seleccionados.');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -342,14 +385,13 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
     await manualSendEmail(selectedEmails, nameEncuesta, body);
   }
 
-
-  Future<void> manualSendEmail(List<String> recipients, String nameEncuesta, String body) async {
+  Future<void> manualSendEmail(
+      List<String> recipients, String nameEncuesta, String body) async {
     String subject = "Invitación a diligenciar la encuesta $nameEncuesta";
     final String recipientsString = recipients.join(',');
 
     final url = Uri.parse(
-      'https://v1.nocodeapi.com/javirueda7/zohomail/PrBQEYwVPmgtekXW/sendEmail?fromAddress=auxiliar.pmo@cyma.com.co&toAddress=$recipientsString&content=$body&subject=$subject&mailFormat=html'
-    );
+        'https://v1.nocodeapi.com/javirueda7/zohomail/PrBQEYwVPmgtekXW/sendEmail?fromAddress=auxiliar.pmo@cyma.com.co&toAddress=$recipientsString&content=$body&subject=$subject&mailFormat=html');
 
     final headers = {
       'Content-Type': 'application/json',
@@ -363,8 +405,6 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
       print('Failed: ${response.statusCode}');
     }
   }
-
-
 
   void confirmacionEmail(BuildContext context, String id, String nameEncuesta) {
     TextEditingController emailBodyController = TextEditingController(text: '''
@@ -386,7 +426,8 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text('¿ESTÁS SEGURO QUE DESEAS ENVIAR LA INVITACIÓN A RESPONDER $nameEncuesta?'),
+              Text(
+                  '¿ESTÁS SEGURO QUE DESEAS ENVIAR LA INVITACIÓN A RESPONDER $nameEncuesta?'),
               SizedBox(height: 20),
               SizedBox(
                 width: 800,
@@ -412,9 +453,11 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
             TextButton(
               child: Text('ENVIAR INVITACIONES'),
               onPressed: () async {
-                String emailBody = generateSimpleHtmlBody(emailBodyController.text);                
+                String emailBody =
+                    generateSimpleHtmlBody(emailBodyController.text);
                 Navigator.of(context).pop(); // Cierra el diálogo
-                await sendEmail(id, nameEncuesta, emailBody); // Llama a la función de envío de correo
+                await sendEmail(id, nameEncuesta,
+                    emailBody); // Llama a la función de envío de correo
               },
             ),
           ],
@@ -426,7 +469,7 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
   String generateSimpleHtmlBody(String body) {
     // Reemplaza los saltos de línea con etiquetas <br>
     String htmlBody = body.replaceAll('\n', '<br>');
-    
+
     return '''
     <html>
       <body>
@@ -435,7 +478,6 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
     </html>
     ''';
   }
-
 
   Future<void> _loadAndShowUsers(
     BuildContext context,
@@ -492,9 +534,7 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
       }).toList();
 
       // Esperar todos los futures y filtrar nulls
-      final users = (await Future.wait(futures))
-          .whereType<User>()
-          .toList();
+      final users = (await Future.wait(futures)).whereType<User>().toList();
 
       // 3. Ordenar por estado y luego por nombre, igual que antes
       users.sort((a, b) {
@@ -544,14 +584,6 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                     subtitle: Text(users[index].id), // ID del usuario
                     trailing: IconButton(
                       onPressed: () {
-                        print(id);
-                        print(titulo);
-                        print(dates);
-                        print(users[index].id);
-                        print(hours);
-                        print(users[index].answer);
-                        print((users[index].date as Timestamp).toDate());
-
                         if (users[index].status != 'ABIERTA') {
                           Navigator.push(
                             context,
@@ -614,12 +646,7 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
       }
     }
   }
-
-
-
 }
-
-
 
 class User {
   final String id;
@@ -628,5 +655,10 @@ class User {
   final dynamic answer;
   final dynamic date;
 
-  User({required this.id, required this.status, required this.data, required this.answer, required this.date});
+  User(
+      {required this.id,
+      required this.status,
+      required this.data,
+      required this.answer,
+      required this.date});
 }

@@ -1,7 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:forms_app/form.dart';
-import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:forms_app/addeditforms.dart';
@@ -333,150 +332,17 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
     }
   }
 
-  Future<void> sendEmail(String id, String nameEncuesta, String body) async {
-    final firestore = FirebaseFirestore.instance;
-
-    // 1. Obtener IDs de la subcolección 'Usuarios' dentro de 'Encuestas'
-    final selectedUsersSnapshot = await firestore
-        .collection('Encuestas')
-        .doc(id)
-        .collection('Usuarios')
-        .get();
-
-    final selectedUsersIds =
-        selectedUsersSnapshot.docs.map((doc) => doc.id).toList();
-
-    // 2. Leer documentos de 'Usuarios' en paralelo (en vez de 1x1)
-    final futures = selectedUsersIds.map((userId) async {
-      final userDoc = await firestore.collection('Usuarios').doc(userId).get();
-      final userData = userDoc.data();
-
-      if (userDoc.exists && userData != null && userData.containsKey('email')) {
-        return userData['email'] as String;
-      }
-      return null;
-    }).toList();
-
-    final selectedEmails =
-        (await Future.wait(futures)).whereType<String>().toList();
-
-    // Si no hay correos, no seguimos
-    if (selectedEmails.isEmpty) {
-      print(
-          'No se encontraron correos electrónicos para los usuarios seleccionados.');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se encontraron correos electrónicos válidos.'),
-          ),
-        );
-      }
-      return;
-    }
-
-    // Opcional: si quieres reflejar algo en la UI
-    if (mounted) {
-      setState(() {});
-    }
-
-    print(selectedEmails); // Para verificar la lista
-
-    // 3. Enviar correo usando tu función existente
-    await manualSendEmail(selectedEmails, nameEncuesta, body);
-  }
-
-  Future<void> manualSendEmail(
-      List<String> recipients, String nameEncuesta, String body) async {
-    String subject = "Invitación a diligenciar la encuesta $nameEncuesta";
-    final String recipientsString = recipients.join(',');
-
-    final url = Uri.parse(
-        'https://v1.nocodeapi.com/javirueda7/zohomail/PrBQEYwVPmgtekXW/sendEmail?fromAddress=auxiliar.pmo@cyma.com.co&toAddress=$recipientsString&content=$body&subject=$subject&mailFormat=html');
-
-    final headers = {
-      'Content-Type': 'application/json',
-    };
-
-    final response = await http.post(url, headers: headers);
-
-    if (response.statusCode == 200) {
-      print('Success: ${response.body}');
-    } else {
-      print('Failed: ${response.statusCode}');
-    }
-  }
-
+  // El envío de invitaciones por correo está fuera de servicio: el servicio
+  // anterior (Zoho vía nocodeapi) fue dado de baja. Pendiente de un reemplazo
+  // que corra en un servidor y no en el navegador.
   void confirmacionEmail(BuildContext context, String id, String nameEncuesta) {
-    TextEditingController emailBodyController = TextEditingController(text: '''
-      Hola, el área técnica de CyMA te invita a responder la última encuesta, presiona en el siguiente link para visitar la plataforma de Encuestas MOP.
-      
-      https://cyma-encuestasmop.github.io/EncuestasMOP/
-      
-      Si ya fue respondida, hacer caso omiso a este correo.
-
-      Cordial saludo,
-      Equipo CyMA - Encuestas MOP
-    ''');
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('CONFIRMACIÓN'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                  '¿ESTÁS SEGURO QUE DESEAS ENVIAR LA INVITACIÓN A RESPONDER $nameEncuesta?'),
-              SizedBox(height: 20),
-              SizedBox(
-                width: 800,
-                child: TextField(
-                  controller: emailBodyController,
-                  decoration: InputDecoration(
-                    labelText: 'Cuerpo del correo',
-                    hintText: 'Escribe tu mensaje aquí',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 20,
-                ),
-              ),
-            ],
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: Text('CANCELAR'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: Text('ENVIAR INVITACIONES'),
-              onPressed: () async {
-                String emailBody =
-                    generateSimpleHtmlBody(emailBodyController.text);
-                Navigator.of(context).pop(); // Cierra el diálogo
-                await sendEmail(id, nameEncuesta,
-                    emailBody); // Llama a la función de envío de correo
-              },
-            ),
-          ],
-        );
-      },
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+            'El envío de invitaciones por correo no está disponible por ahora.'),
+        duration: Duration(seconds: 5),
+      ),
     );
-  }
-
-  String generateSimpleHtmlBody(String body) {
-    // Reemplaza los saltos de línea con etiquetas <br>
-    String htmlBody = body.replaceAll('\n', '<br>');
-
-    return '''
-    <html>
-      <body>
-        <p>$htmlBody</p>
-      </body>
-    </html>
-    ''';
   }
 
   Future<void> _loadAndShowUsers(

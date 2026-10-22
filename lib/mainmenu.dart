@@ -1,11 +1,11 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, library_private_types_in_public_api
 
 import 'package:flutter/material.dart';
+import 'package:forms_app/consultas.dart';
 import 'package:forms_app/listforms.dart';
 import 'package:forms_app/listparam.dart';
 import 'package:forms_app/listusers.dart';
 import 'package:forms_app/userforms.dart';
-import 'dart:html' as html;
 
 class MainMenu extends StatefulWidget {
   final String? role;
@@ -109,10 +109,10 @@ class _MainMenuState extends State<MainMenu> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: () => html.window.open(
-                      "https://app.powerbi.com/view?r=eyJrIjoiMzBiZGZjMGYtMjJlMy00NDhiLThlODUtNmE3Mzk3NjA1MWM2IiwidCI6IjJlZDU1NzRjLWY5YmEtNDQyNi05NjU4LWU0NzdhZDc0MzlkYiIsImMiOjR9",
-                      '_blank',
-                    ),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ConsultasPage())),
                     icon: const Icon(Icons.analytics_outlined, size: 20),
                     label: const Text('CONSULTAS'),
                   ),

@@ -77,6 +77,13 @@ service cloud.firestore {
       allow update, delete: if catalog in ['Proyectos', 'Actividades'] && isAdmin();
     }
 
+    // Configuración de la app (p. ej. enlace del informe de consultas).
+    // La leen los administradores y consultores; solo un MASTER la modifica.
+    match /Configuracion/{id} {
+      allow read: if isStaff();
+      allow write: if isMaster();
+    }
+
     // Registro de acciones de administradores sobre encuestas ajenas.
     // Solo se agrega: nadie lo edita ni lo borra.
     match /Auditoria/{id} {

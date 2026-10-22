@@ -1,11 +1,11 @@
 {
-    "name": "forms_app",
-    "short_name": "forms_app",
+    "name": "CyMA - Encuestas MOP",
+    "short_name": "Encuestas MOP",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#143D66",
+    "theme_color": "#143D66",
+    "description": "Encuestas semanales de horas por proyecto de CyMA.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

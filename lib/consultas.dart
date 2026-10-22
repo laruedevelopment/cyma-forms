@@ -57,7 +57,7 @@ class _ConsultasPageState extends State<ConsultasPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('CONSULTAS')),
+      appBar: AppBar(title: const Text('Consultas')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _viewType == null

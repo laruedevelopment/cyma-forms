@@ -1,18 +1,19 @@
 // ignore_for_file: use_build_context_synchronously
 
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:forms_app/form.dart';
 import 'package:forms_app/services/firebase_services.dart';
 import 'package:forms_app/services/hours_utils.dart';
+import 'package:forms_app/theme/app_theme.dart';
 import 'package:forms_app/widgets/forms_widgets.dart';
+import 'package:forms_app/widgets/page_body.dart';
 import 'package:intl/intl.dart';
 
 class ListUserForms extends StatefulWidget {
   final String uid;
 
-  ListUserForms({super.key, required this.uid});
+  const ListUserForms({super.key, required this.uid});
 
   @override
   // ignore: library_private_types_in_public_api
@@ -21,7 +22,6 @@ class ListUserForms extends StatefulWidget {
 
 class _ListUserFormsState extends State<ListUserForms> {
   late String uid;
-  // ignore: unused_field
   late Future<List<dynamic>> _futureForms;
 
   @override
@@ -31,8 +31,6 @@ class _ListUserFormsState extends State<ListUserForms> {
     _futureForms = getEncuestasUser(uid); // cargamos por primera vez
   }
 
-  bool isLoading = false;
-
   void _reloadList() {
     setState(() {
       // forzamos a FutureBuilder a usar un Future NUEVO
@@ -40,214 +38,117 @@ class _ListUserFormsState extends State<ListUserForms> {
     });
   }
 
+  /// Abre la encuesta: editable si está activa, solo lectura si ya se cerró.
+  Future<void> _abrir(dynamic item) async {
+    final String? status = await getStatus(item['id'], uid);
+    if (status != item['user']['status']) {
+      _reloadList();
+    }
+
+    final bool activa = item['data']['status'] == 'ACTIVA';
+    final bool abierta = item['user']['status'] == 'ABIERTA';
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FormsPage(
+          idForm: item['id'],
+          formName: item['data']['name'],
+          dates: item['data']['startDate'] + ' - ' + item['data']['endDate'],
+          uidUser: uid,
+          hours: horasEsperadasDe(item['data']),
+          formState: activa ? item['user']['status'] : 'ENVIADA',
+          answers: abierta ? 'NULL' : item['user']['answer'],
+          date: abierta
+              ? DateTime.now()
+              : (item['user']['date'] as Timestamp).toDate(),
+          reloadList: _reloadList,
+        ),
+      ),
+    );
+
+    if (!activa) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Esta encuesta ya está cerrada: solo puedes consultarla.'),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
+
+    // Al volver de FormsPage, volvemos a consultar Firestore
+    _reloadList();
+  }
+
+  String _accion(dynamic item) {
+    if (item['data']['status'] != 'ACTIVA') return 'Ver';
+    switch (item['user']['status']) {
+      case 'ENVIADA':
+        return 'Ver';
+      case 'GUARDADA':
+        return 'Continuar';
+      default:
+        return 'Responder';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(
-        title: Center(child: Text('ENCUESTAS')),
-      ),
-      body: Padding(
-        padding: EdgeInsets.fromLTRB(350, 50, 350, 50),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'ENCUESTAS',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+      appBar: AppBar(title: const Text('Responder encuesta')),
+      body: FutureBuilder<List<dynamic>>(
+        future: _futureForms,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: 'No pudimos cargar tus encuestas',
+              message: 'Revisa tu conexión e inténtalo de nuevo.',
+              actionLabel: 'Reintentar',
+              onAction: _reloadList,
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final encuestas = snapshot.data!;
+          if (encuestas.isEmpty) {
+            return const EmptyState(
+              icon: Icons.assignment_outlined,
+              title: 'Todavía no tienes encuestas asignadas',
+              message:
+                  'Cuando te asignen una, aparecerá aquí para que registres tus horas.',
+            );
+          }
+          return PageBody(
+            maxWidth: 860,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Tus encuestas', style: tema.headlineSmall),
+                const SizedBox(height: 4),
+                Text('Elige una para registrar o revisar tus horas.',
+                    style: tema.bodyMedium),
+                const SizedBox(height: 20),
+                for (final item in encuestas) ...[
+                  _EncuestaCard(
+                    item: item,
+                    accion: _accion(item),
+                    onTap: () => _abrir(item),
                   ),
-                  Text(
-                    'ESTADO',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  const SizedBox(height: 10),
                 ],
-              ), // Add spacing between header and FutureBuilder
+              ],
             ),
-            SizedBox(height: 10),
-            Expanded(
-              child: FutureBuilder(
-                future: _futureForms,
-                builder: ((context, snapshot) {
-                  if (snapshot.hasData) {
-                    return ListView.builder(
-                      itemCount: snapshot.data?.length,
-                      itemBuilder: (context, index) {
-                        final item = snapshot.data?[index];
-                        final userStatus =
-                            item?['user']['status'] as String? ?? '';
-                        final surveyStatus =
-                            item?['data']['status'] as String? ?? '';
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 6),
-                            leading: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(item?['id'] ?? '',
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1A3A6B))),
-                              ],
-                            ),
-                            title: Text(item?['data']['name'] ?? '',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                              '${item?['data']['startDate']} - ${item?['data']['endDate']}',
-                              style: const TextStyle(
-                                  fontSize: 12, color: Color(0xFF78909C)),
-                            ),
-                            trailing: SizedBox(
-                              width: 170,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  userStatus != 'ABIERTA'
-                                      ? Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            statusChip(userStatus),
-                                            const SizedBox(height: 3),
-                                            Text(
-                                              DateFormat('dd-MM-yyyy HH:mm')
-                                                  .format(item?['user']['date']
-                                                      .toDate()),
-                                              style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: Color(0xFF78909C)),
-                                            ),
-                                          ],
-                                        )
-                                      : statusChip(surveyStatus),
-                                  const SizedBox(width: 6),
-                                  IconButton(
-                                    onPressed: () async {
-                                      String? status =
-                                          await getStatus(item?['id'], uid);
-                                      print(status);
-                                      if (status != item?['user']['status']) {
-                                        _reloadList();
-                                      }
-
-                                      if (item?['data']['status'] == 'ACTIVA') {
-                                        // ACTIVA: se puede editar / responder
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => FormsPage(
-                                              idForm: item?[
-                                                  'id'], // Accessing the document ID
-                                              formName: item?['data']['name'],
-                                              dates: item?['data']
-                                                      ['startDate'] +
-                                                  ' - ' +
-                                                  item?['data']['endDate'],
-                                              uidUser: uid,
-                                              hours: horasEsperadasDe(
-                                                  item?['data']),
-                                              formState: item?['user']
-                                                  ['status'],
-                                              answers: item?['user']
-                                                          ['status'] ==
-                                                      'ABIERTA'
-                                                  ? 'NULL'
-                                                  : item?['user']['answer'],
-                                              date: item?['user']['status'] ==
-                                                      'ABIERTA'
-                                                  ? DateTime.now()
-                                                  : (item?['user']['date']
-                                                          as Timestamp)
-                                                      .toDate(),
-                                              reloadList: _reloadList,
-                                            ),
-                                          ),
-                                        );
-                                      } else {
-                                        // NO ACTIVA: solo visualizar, y mostrar mensaje
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => FormsPage(
-                                              idForm: item?[
-                                                  'id'], // Accessing the document ID
-                                              formName: item?['data']['name'],
-                                              dates: item?['data']
-                                                      ['startDate'] +
-                                                  ' - ' +
-                                                  item?['data']['endDate'],
-                                              uidUser: uid,
-                                              hours: horasEsperadasDe(
-                                                  item?['data']),
-                                              formState: 'ENVIADA',
-                                              answers: item?['user']
-                                                          ['status'] ==
-                                                      'ABIERTA'
-                                                  ? 'NULL'
-                                                  : item?['user']['answer'],
-                                              date: item?['user']['status'] ==
-                                                      'ABIERTA'
-                                                  ? DateTime.now()
-                                                  : (item?['user']['date']
-                                                          as Timestamp)
-                                                      .toDate(),
-                                              reloadList: _reloadList,
-                                            ),
-                                          ),
-                                        );
-
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                'La encuesta ya ha sido cerrada.'),
-                                            duration: Duration(seconds: 4),
-                                          ),
-                                        );
-                                      }
-
-                                      // 🔁 Al volver de FormsPage, volvemos a consultar Firestore
-                                      _reloadList();
-                                    },
-                                    icon: item?['user']['status'] == 'ENVIADA'
-                                        ? const Icon(Icons.visibility,
-                                            color: Colors.blueAccent)
-                                        : const Icon(Icons.edit,
-                                            color: Colors.blueAccent),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ), // ListTile
-                        ); // Card
-                      },
-                    );
-                  } else {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                }),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
   Future<String?> getStatus(String itemId, String uid) async {
     try {
-      // Fetch the document snapshot from Firebase
       var documentSnapshot = await FirebaseFirestore.instance
           .collection('Encuestas')
           .doc(itemId)
@@ -256,17 +157,94 @@ class _ListUserFormsState extends State<ListUserForms> {
           .get();
 
       if (documentSnapshot.exists) {
-        // Extract the data and retrieve the 'status'
         var data = documentSnapshot.data();
         return data?['status'];
       } else {
-        // Handle the case where the document does not exist
-        return null; // or handle as appropriate
+        return null;
       }
     } catch (e) {
-      // Handle any errors that occur during data retrieval
-      print('Error retrieving status: $e');
-      return null; // or handle as appropriate
+      return null;
     }
+  }
+}
+
+class _EncuestaCard extends StatelessWidget {
+  final dynamic item;
+  final String accion;
+  final VoidCallback onTap;
+
+  const _EncuestaCard({
+    required this.item,
+    required this.accion,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
+    final userStatus = item['user']['status'] as String? ?? '';
+    final surveyStatus = item['data']['status'] as String? ?? '';
+    final nombre = item?['data']['name'] ?? '';
+    final fechas =
+        '${item?['data']['startDate']} - ${item?['data']['endDate']}';
+
+    Widget estado;
+    if (userStatus != 'ABIERTA' && item?['user']['date'] != null) {
+      estado = Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          statusChip(userStatus),
+          const SizedBox(height: 4),
+          Text(
+            DateFormat('dd/MM/yyyy HH:mm')
+                .format(item['user']['date'].toDate()),
+            style: tema.bodySmall,
+          ),
+        ],
+      );
+    } else {
+      estado = statusChip(surveyStatus);
+    }
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppTheme.radioTarjeta),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(nombre, style: tema.titleMedium),
+                    const SizedBox(height: 4),
+                    Text('${item?['id'] ?? ''}  ·  $fechas',
+                        style: tema.bodySmall),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              estado,
+              const SizedBox(width: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                decoration: BoxDecoration(
+                  color: Marca.c50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(accion,
+                    style: const TextStyle(
+                        color: Marca.c700,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

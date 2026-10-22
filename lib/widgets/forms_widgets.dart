@@ -1,85 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:forms_app/theme/app_theme.dart';
 
+/// Etiqueta de estado: colores suaves con buen contraste y texto en minúscula.
 Widget statusChip(String status) {
   final Color bg;
   final Color fg;
   switch (status.toUpperCase()) {
     case 'ENVIADA':
-      bg = const Color(0xFF2E7D32);
-      fg = Colors.white;
+      bg = Tinta.okFondo;
+      fg = Tinta.ok;
       break;
     case 'GUARDADA':
-      bg = const Color(0xFFE65100);
-      fg = Colors.white;
+      bg = Tinta.avisoFondo;
+      fg = Tinta.aviso;
       break;
     case 'ACTIVA':
     case 'ABIERTA':
-      bg = const Color(0xFF1565C0);
-      fg = Colors.white;
+      bg = Marca.c50;
+      fg = Marca.c700;
       break;
-    case 'CERRADA':
-      bg = const Color(0xFF6A1B9A);
-      fg = Colors.white;
-      break;
-    case 'CREADA':
-      bg = const Color(0xFF546E7A);
-      fg = Colors.white;
-      break;
-    default:
-      bg = const Color(0xFF90A4AE);
-      fg = Colors.white;
+    default: // CERRADA, CREADA, etc.
+      bg = const Color(0xFFF1F5F9);
+      fg = Tinta.textoMedio;
   }
+  final texto = status.isEmpty
+      ? ''
+      : status[0].toUpperCase() + status.substring(1).toLowerCase();
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration:
         BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-    child: Text(status.toUpperCase(),
+    child: Text(texto,
         style: TextStyle(
             color: fg,
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.3)),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.1)),
   );
 }
 
-Container firebaseButton(BuildContext context, String title, Function onTap,
+/// Botón principal de ancho completo. Mientras `loading` es true se bloquea y
+/// muestra un indicador de carga.
+Widget firebaseButton(BuildContext context, String title, Function onTap,
     {bool loading = false}) {
-  return Container(
-    width: MediaQuery.of(context).size.width,
-    height: 50,
-    margin: const EdgeInsets.fromLTRB(0, 10, 0, 20),
-    decoration: BoxDecoration(borderRadius: BorderRadius.circular(90)),
+  return SizedBox(
+    width: double.infinity,
+    height: 48,
     child: ElevatedButton(
-        onPressed: loading
-            ? null
-            : () {
-                onTap();
-              },
-        style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.pressed)) {
-                return Colors.amber;
-              }
-              return Colors.amber;
-            }),
-            shape: WidgetStateProperty.all<RoundedRectangleBorder>(
-                RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30)))),
-        child: loading
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    strokeWidth: 3, color: Color(0xFF1A3A6B)),
-              )
-            : Text(
-                title,
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16),
-              )),
+      onPressed: loading ? null : () => onTap(),
+      child: loading
+          ? const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                  strokeWidth: 3, color: Colors.white),
+            )
+          : Text(title, style: const TextStyle(fontSize: 15)),
+    ),
   );
 }
 
@@ -115,8 +93,7 @@ Widget buildDateField(
     readOnly: true,
     decoration: InputDecoration(
       labelText: label,
-      border: OutlineInputBorder(),
-      contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
     ),
   );
 }
@@ -133,10 +110,9 @@ Widget buildDropdownField(
     child: InputDecorator(
       decoration: InputDecoration(
         labelText: label,
-        border: OutlineInputBorder(),
-        constraints: BoxConstraints(maxWidth: 800),
-        contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        enabled: allowChange, // This will change the visual appearance
+        constraints: const BoxConstraints(maxWidth: 800),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        enabled: allowChange,
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButtonFormField<String>(
@@ -187,11 +163,7 @@ Widget buildTextField(
     child: TextFormField(
       controller: controller,
       readOnly: read,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(),
-        contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      ),
+      decoration: InputDecoration(labelText: label),
     ),
   );
 }
@@ -212,11 +184,8 @@ Widget buildEmailField(
     child: TextFormField(
       controller: controller,
       readOnly: read,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(),
-        contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      ),
+      keyboardType: TextInputType.emailAddress,
+      decoration: InputDecoration(labelText: label),
     ),
   );
 }
@@ -228,15 +197,11 @@ Widget buildNumberField(
     child: TextFormField(
       controller: controller,
       readOnly: read,
-      keyboardType: TextInputType.number, // Set keyboard type to number
+      keyboardType: TextInputType.number,
       inputFormatters: <TextInputFormatter>[
-        FilteringTextInputFormatter.digitsOnly // Allow only digits
+        FilteringTextInputFormatter.digitsOnly
       ],
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(),
-        contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      ),
+      decoration: InputDecoration(labelText: label),
     ),
   );
 }
@@ -244,22 +209,26 @@ Widget buildNumberField(
 Widget buildButton(String label, Color color, void Function()? onPressed) {
   return ElevatedButton(
     onPressed: onPressed,
-    style: ElevatedButton.styleFrom(
-      backgroundColor: color,
-      padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-    ),
-    child: Text(
-      label,
-      style: TextStyle(color: Colors.white),
-    ),
+    style: ElevatedButton.styleFrom(backgroundColor: color),
+    child: Text(label),
   );
 }
 
 class PasswordField extends StatefulWidget {
   final String label;
   final TextEditingController controller;
+  final ValueChanged<String>? onSubmitted;
+  final TextInputAction? textInputAction;
+  final Iterable<String>? autofillHints;
 
-  PasswordField({required this.label, required this.controller});
+  const PasswordField({
+    super.key,
+    required this.label,
+    required this.controller,
+    this.onSubmitted,
+    this.textInputAction,
+    this.autofillHints,
+  });
 
   @override
   // ignore: library_private_types_in_public_api
@@ -268,12 +237,6 @@ class PasswordField extends StatefulWidget {
 
 class _PasswordFieldState extends State<PasswordField> {
   bool _obscureText = true;
-
-  void _toggleVisibility() {
-    setState(() {
-      _obscureText = !_obscureText;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -285,16 +248,21 @@ class _PasswordFieldState extends State<PasswordField> {
         enableSuggestions: false,
         autocorrect: false,
         keyboardType: TextInputType.visiblePassword,
+        textInputAction: widget.textInputAction,
+        autofillHints: widget.autofillHints,
+        onFieldSubmitted: widget.onSubmitted,
         decoration: InputDecoration(
           labelText: widget.label,
-          border: OutlineInputBorder(),
-          contentPadding:
-              EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           suffixIcon: IconButton(
+            tooltip: _obscureText ? 'Mostrar contraseña' : 'Ocultar contraseña',
             icon: Icon(
-              _obscureText ? Icons.visibility : Icons.visibility_off,
+              _obscureText
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              size: 20,
+              color: Tinta.textoSuave,
             ),
-            onPressed: _toggleVisibility,
+            onPressed: () => setState(() => _obscureText = !_obscureText),
           ),
         ),
       ),

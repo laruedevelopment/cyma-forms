@@ -18,8 +18,26 @@
 
   <title>CyMA - Encuestas MOP</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    body { margin: 0; background: #f7f6f3; }
+    #carga { position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      font: 15px system-ui, sans-serif; color: #566274; }
+    #carga i { width: 34px; height: 34px; border-radius: 50%;
+      border: 3px solid #d6e2ee; border-top-color: #143d66;
+      animation: giro 0.9s linear infinite; }
+    @keyframes giro { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #carga i { animation-duration: 3s; } }
+  </style>
 </head>
 <body>
+  <div id="carga" role="status"><i></i><span>Cargando Encuestas MOP…</span></div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var c = document.getElementById('carga');
+      if (c) c.remove();
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

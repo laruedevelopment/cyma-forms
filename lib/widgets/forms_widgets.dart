@@ -15,6 +15,10 @@ Widget statusChip(String status) {
       bg = Tinta.avisoFondo;
       fg = Tinta.aviso;
       break;
+    case 'PENDIENTE':
+      bg = Tinta.avisoFondo;
+      fg = Tinta.aviso;
+      break;
     case 'ACTIVA':
     case 'ABIERTA':
       bg = Marca.c50;
@@ -26,7 +30,9 @@ Widget statusChip(String status) {
   }
   final texto = status.isEmpty
       ? ''
-      : status[0].toUpperCase() + status.substring(1).toLowerCase();
+      : status.toUpperCase() == 'ABIERTA'
+          ? 'Sin iniciar'
+          : status[0].toUpperCase() + status.substring(1).toLowerCase();
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration:

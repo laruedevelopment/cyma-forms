@@ -133,8 +133,8 @@ class _FormsPageState extends State<FormsPage> {
   }
 
   Future<void> retrieveDataAndInit() async {
-    await retrieveData();
-    await Future.wait([initPro(), initAct()]);
+    // Datos de la persona, proyectos y actividades en paralelo.
+    await Future.wait([retrieveData(), initPro(), initAct()]);
   }
 
   Future<bool> _sendToSheetsAtomic({
@@ -229,21 +229,16 @@ class _FormsPageState extends State<FormsPage> {
   }
 
   Future<List<Parametro>> getParamwithId(String param) async {
-    List<Parametro> parametros = [];
-    QuerySnapshot queryParametros;
-    if (widget.formState == 'ENVIADA') {
-      queryParametros =
-          await FirebaseFirestore.instance.collection(param).get();
-    } else {
-      queryParametros = await FirebaseFirestore.instance
-          .collection(param)
-          .where('status', isNotEqualTo: 'INACTIVO')
-          .get();
-    }
-    for (var doc in queryParametros.docs) {
-      parametros.add(Parametro(id: doc.id, name: doc['name']));
-    }
-    return parametros;
+    // Catálogo en caché; en una encuesta enviada se ven todos, también los inactivos.
+    // Proyectos y actividades se leen siempre al día: si un admin inactiva
+    // uno, no debe seguir ofreciéndose.
+    final docs = await catalogo(param, forzar: true);
+    return [
+      for (final d in docs)
+        if (widget.formState == 'ENVIADA' ||
+            (d['data']['status'] != null && d['data']['status'] != 'INACTIVO'))
+          Parametro(id: d['id'], name: d['data']['name'] ?? '')
+    ];
   }
 
   Future<void> retrieveData() async {
@@ -256,9 +251,12 @@ class _FormsPageState extends State<FormsPage> {
         // Access data from snapshot
         Map<String, dynamic>? data = snapshot.data() as Map<String, dynamic>?;
         if (data != null) {
-          final profession =
-              await fetchParameter('Profesiones', data['profession']);
-          final position = await fetchParameter('Cargos', data['position']);
+          final nombres = await Future.wait([
+            fetchParameter('Profesiones', data['profession']),
+            fetchParameter('Cargos', data['position']),
+          ]);
+          final profession = nombres[0];
+          final position = nombres[1];
           setState(() {
             idTypeController.text = data['idType'] ?? '';
             idController.text = data['id'] ?? '';
@@ -661,6 +659,33 @@ class _FormsPageState extends State<FormsPage> {
   }
 
   /// Guarda el borrador o envía la encuesta, según `enviarEncuesta`.
+  /// Nombres de proyectos o actividades elegidos que hoy están INACTIVOS.
+  Future<List<String>> _inactivosElegidos() async {
+    try {
+      final r = await Future.wait([
+        catalogo('Proyectos', forzar: true),
+        catalogo('Actividades', forzar: true),
+      ]);
+      Set<String> inactivos(List<Map<String, dynamic>> docs) => {
+            for (final d in docs)
+              if (d['data']['status'] == 'INACTIVO')
+                (d['data']['name'] ?? '').toString().trim()
+          };
+      final proyectos = inactivos(r[0]);
+      final actividades = inactivos(r[1]);
+      final elegidos = <String>[];
+      for (int i = 0; i < projectControllers.length; i++) {
+        final pr = projectControllers[i].text.trim();
+        final ac = activityControllers[i].text.trim();
+        if (proyectos.contains(pr)) elegidos.add(pr);
+        if (actividades.contains(ac)) elegidos.add(ac);
+      }
+      return elegidos;
+    } catch (_) {
+      return []; // si no se puede comprobar, no bloquea el guardado
+    }
+  }
+
   Future<void> _enviarOGuardar() async {
     // Lock the button immediately to prevent double-submit
     setState(() {
@@ -703,6 +728,25 @@ class _FormsPageState extends State<FormsPage> {
       }
 
       if (!confirmed) {
+        setState(() {
+          isLoading = false;
+          pressed = false;
+        });
+        return;
+      }
+
+      // Un proyecto o actividad inactivado mientras la persona llenaba la
+      // encuesta no puede guardarse: se revisa contra los datos actuales.
+      final inactivos = await _inactivosElegidos();
+      if (inactivos.isNotEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Ya no está disponible: ${inactivos.join(', ')}. Cámbialo por otro y vuelve a intentar.'),
+            duration: const Duration(seconds: 6),
+          ),
+        );
         setState(() {
           isLoading = false;
           pressed = false;

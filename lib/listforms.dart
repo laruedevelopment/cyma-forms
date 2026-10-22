@@ -6,10 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:forms_app/addeditforms.dart';
 import 'package:forms_app/services/firebase_services.dart';
 import 'package:forms_app/services/hours_utils.dart';
+import 'package:forms_app/theme/app_theme.dart';
 import 'package:forms_app/widgets/forms_widgets.dart';
+import 'package:forms_app/widgets/page_body.dart';
 
 class ListFormsScreen extends StatefulWidget {
-  ListFormsScreen({super.key});
+  const ListFormsScreen({super.key});
 
   @override
   // ignore: library_private_types_in_public_api
@@ -18,260 +20,142 @@ class ListFormsScreen extends StatefulWidget {
 
 class _ListFormsScreenState extends State<ListFormsScreen> {
   void _reloadList() {
-    setState(() {}); // Empty setState just to trigger rebuild
+    setState(() {
+      _futuro = _cargar();
+    });
   }
 
   @override
   void initState() {
     super.initState();
+    _futuro = _cargar();
+  }
+
+  late Future<List<dynamic>> _futuro;
+
+  Future<List<dynamic>> _cargar() async => await getEncuestas();
+
+  void _abrirEditor(dynamic item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEditForm(
+          reloadList: _reloadList,
+          id: item['id'],
+          name: item['data']['name'],
+          startDate: item['data']['startDate'],
+          endDate: item['data']['endDate'],
+          days: item['data']['days'],
+          status: item['data']['status'],
+          hours: item['data']['hours'],
+          tipo: item['data']['tipo'],
+        ),
+      ),
+    );
+  }
+
+  void _verUsuarios(dynamic item) {
+    final String dates =
+        item['data']['startDate'] + ' - ' + item['data']['endDate'];
+    final String hours = horasEsperadasDe(item['data']);
+    _loadAndShowUsers(context, item['id'], item['data']['name'] ?? '', dates,
+        hours, item['data']['status']);
   }
 
   @override
   Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(
-        title: Center(child: Text('ADMINISTRACIÓN DE ENCUESTAS')),
+      appBar: AppBar(title: const Text('Administrar encuestas')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => modalTipoEncuesta(context),
+        icon: const Icon(Icons.add),
+        label: const Text('Nueva encuesta'),
       ),
-      body: Padding(
-        padding: EdgeInsets.fromLTRB(350, 50, 350, 50),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'ENCUESTAS',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+      body: FutureBuilder<List<dynamic>>(
+        future: _futuro,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: 'No pudimos cargar las encuestas',
+              message: 'Revisa tu conexión e inténtalo de nuevo.',
+              actionLabel: 'Reintentar',
+              onAction: _reloadList,
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final encuestas = snapshot.data!;
+          return PageBody(
+            maxWidth: 960,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Encuestas', style: tema.headlineSmall),
+                const SizedBox(height: 4),
+                Text(
+                    'Toca una encuesta para editarla. Con el ojo ves quién ha respondido.',
+                    style: tema.bodyMedium),
+                const SizedBox(height: 20),
+                if (encuestas.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: Text('Todavía no hay encuestas.')),
                   ),
-                  Text(
-                    'ESTADO',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                for (final item in encuestas) ...[
+                  _TarjetaEncuesta(
+                    item: item,
+                    onEditar: () => _abrirEditor(item),
+                    onVer: () => _verUsuarios(item),
+                    onCorreo: () => confirmacionEmail(
+                        context, item['id'], item['data']['name']),
+                    onEliminar: () =>
+                        mostrarDialogoConfirmacion(context, item['id']),
                   ),
+                  const SizedBox(height: 10),
                 ],
-              ), // Add spacing between header and FutureBuilder
+                const SizedBox(height: 72),
+              ],
             ),
-            SizedBox(height: 10),
-            Expanded(
-              child: FutureBuilder(
-                future: getEncuestas(),
-                builder: ((context, snapshot) {
-                  if (snapshot.hasData) {
-                    return ListView.builder(
-                      itemCount: snapshot.data?.length,
-                      itemBuilder: (context, index) {
-                        final item = snapshot.data?[index];
-                        return SizedBox(
-                            height: 100, // Adjust height as necessary
-                            child: GestureDetector(
-                              child: Card(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(10.0),
-                                  child: Row(
-                                    children: [
-                                      Text(
-                                        item?['id'] ?? '',
-                                        style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                      SizedBox(width: 20),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Text(item?['data']['name'] ?? '',
-                                                style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 16)),
-                                            Text(
-                                              '${item?['data']['startDate']} - ${item?['data']['endDate']}',
-                                              style: TextStyle(fontSize: 15),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      SizedBox(width: 20),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            statusChip(
-                                                item?['data']['status'] ?? ''),
-                                            Text(
-                                              'USUARIOS ASOCIADOS: ${item?['usuariosTotal'] ?? ''}',
-                                              style: TextStyle(fontSize: 14),
-                                            ),
-                                            Text(
-                                              'USUARIOS POR RESPONDER: ${item?['usuariosNonEnviada'] ?? ''}',
-                                              style: TextStyle(fontSize: 14),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      IconButton(
-                                        onPressed: () {
-                                          String dates = item?['data']
-                                                  ['startDate'] +
-                                              ' - ' +
-                                              item?['data']['endDate'];
-                                          String hours =
-                                              horasEsperadasDe(item?['data']);
-                                          _loadAndShowUsers(
-                                              context,
-                                              item?['id'],
-                                              item?['data']['name'] ?? '',
-                                              dates,
-                                              hours,
-                                              item?['data']['status']);
-                                        },
-                                        icon: Icon(
-                                            Icons.remove_red_eye_outlined,
-                                            color: Colors.blue),
-                                      ),
-                                      Visibility(
-                                        visible: true,
-                                        child: IconButton(
-                                          onPressed: () {
-                                            if (item != null &&
-                                                item.containsKey('id') &&
-                                                item['data']['status'] ==
-                                                    'ACTIVA') {
-                                              confirmacionEmail(
-                                                  context,
-                                                  item['id'],
-                                                  item['data']['name']);
-                                            }
-                                          },
-                                          icon: Icon(Icons.email_outlined,
-                                              color: item?['data']['status'] ==
-                                                      'ACTIVA'
-                                                  ? Colors.green
-                                                  : Colors.grey),
-                                        ),
-                                      ),
-                                      IconButton(
-                                        onPressed: () {
-                                          if (item != null &&
-                                              item.containsKey('id') &&
-                                              item['data']['status'] ==
-                                                  'CREADA') {
-                                            mostrarDialogoConfirmacion(
-                                                context, item['id']);
-                                          } else {
-                                            print(
-                                                'Error: ID del documento no disponible');
-                                          }
-                                        },
-                                        icon: Icon(
-                                            Icons.delete_outline_outlined,
-                                            color: item?['data']['status'] ==
-                                                    'CREADA'
-                                                ? Colors.red
-                                                : Colors.grey),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              onTap: () {
-                                showDialog(
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      return AddEditForm(
-                                        reloadList: _reloadList,
-                                        id: item?['id'],
-                                        name: item?['data']['name'],
-                                        startDate: item?['data']['startDate'],
-                                        endDate: item?['data']['endDate'],
-                                        days: item?['data']['days'],
-                                        status: item?['data']['status'],
-                                        hours: item?['data']['hours'],
-                                        tipo: item?['data']['tipo'],
-                                      );
-                                    });
-                              },
-                            ));
-                      },
-                    );
-                  } else {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                }),
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          modalTipoEncuesta(context);
+          );
         },
-        child: Icon(Icons.add),
       ),
     );
   }
 
   void modalTipoEncuesta(BuildContext context) {
+    void ir(String tipo) {
+      Navigator.of(context).pop();
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) =>
+                AddEditForm(tipo: tipo, reloadList: _reloadList)),
+      );
+    }
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('TIPO DE ENCUESTA'),
-          content: Text('¿PARA QUIÉN ESTÁ DESTINADA ESTA ENCUESTA?'),
+          title: const Text('Nueva encuesta'),
+          content: const SizedBox(
+            width: 380,
+            child: Text('¿Para quién es esta encuesta?'),
+          ),
           actions: <Widget>[
             TextButton(
-              child: Text('ENCUESTA PARA GERENTES'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => AddEditForm(
-                            tipo: 'G',
-                            reloadList: _reloadList,
-                          )), // Navigate to the NewUserPage
-                );
-              },
+              child: const Text('Cancelar'),
+              onPressed: () => Navigator.of(context).pop(),
             ),
-            TextButton(
-              child: Text('ENCUESTA PARA USUARIOS'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => AddEditForm(
-                            tipo: 'U',
-                            reloadList: _reloadList,
-                          )), // Navigate to the NewUserPage
-                );
-              },
-            ),
-            TextButton(
-              child: Text('ENCUESTA PARA TODOS'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => AddEditForm(
-                            tipo: 'T',
-                            reloadList: _reloadList,
-                          )), // Navigate to the NewUserPage
-                );
-              },
-            ),
+            OutlinedButton(
+                onPressed: () => ir('G'), child: const Text('Gerentes')),
+            OutlinedButton(
+                onPressed: () => ir('U'), child: const Text('Usuarios')),
+            ElevatedButton(
+                onPressed: () => ir('T'), child: const Text('Todos')),
           ],
         );
       },
@@ -283,17 +167,19 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('CONFIRMACIÓN'),
-          content: Text('¿ESTÁS SEGURO DE QUE DESEAS ELIMINAR ESTA ENCUESTA?'),
+          title: const Text('Eliminar encuesta'),
+          content: const Text(
+              '¿Seguro que quieres eliminar esta encuesta? Solo se pueden eliminar las que aún no se han enviado.'),
           actions: <Widget>[
             TextButton(
-              child: Text('CANCELAR'),
+              child: const Text('Cancelar'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
-            TextButton(
-              child: Text('ELIMINAR'),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Tinta.error),
+              child: const Text('Eliminar'),
               onPressed: () async {
                 Navigator.of(context).pop(); // Cierra el diálogo
                 await eliminarItem(
@@ -317,7 +203,7 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
       if (mounted) {
         // Verifica si el widget aún está montado
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ENCUESTA ELIMINADA SATISFACTORIAMENTE')),
+          const SnackBar(content: Text('Encuesta eliminada.')),
         );
         _reloadList(); // Asegúrate de definir _reloadList en tu widget para actualizar la lista
       }
@@ -374,33 +260,37 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
           .collection('Usuarios')
           .get();
 
-      // 2. Disparar TODAS las lecturas a 'Usuarios' en paralelo (en vez de 1x1)
-      final futures = selectedUsersSnapshot.docs.map((doc) async {
-        final userId = doc.id;
-        final dataEncuestaUser = doc.data();
-        final userStatus = dataEncuestaUser['status'];
-        final userAnswer = dataEncuestaUser['answer'];
-        final userDate = dataEncuestaUser['date'];
-
-        final userDoc =
-            await firestore.collection('Usuarios').doc(userId).get();
-        final userData = userDoc.data();
-
-        if (!userDoc.exists || userData == null) {
-          return null;
+      // 2. Datos de las personas: una consulta por cada 30 (límite de whereIn)
+      //    en vez de una lectura por persona.
+      final ids = selectedUsersSnapshot.docs.map((d) => d.id).toList();
+      final bloques = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+      for (int i = 0; i < ids.length; i += 30) {
+        bloques.add(firestore
+            .collection('Usuarios')
+            .where(FieldPath.documentId,
+                whereIn: ids.sublist(i, i + 30 > ids.length ? ids.length : i + 30))
+            .get());
+      }
+      final datosPersonas = <String, Map<String, dynamic>>{};
+      for (final snap in await Future.wait(bloques)) {
+        for (final d in snap.docs) {
+          datosPersonas[d.id] = d.data();
         }
+      }
 
-        return User(
-          id: userId,
-          status: userStatus,
+      final users = <User>[];
+      for (final doc in selectedUsersSnapshot.docs) {
+        final userData = datosPersonas[doc.id];
+        if (userData == null) continue;
+        final dataEncuestaUser = doc.data();
+        users.add(User(
+          id: doc.id,
+          status: dataEncuestaUser['status'],
           data: userData,
-          answer: userAnswer,
-          date: userDate,
-        );
-      }).toList();
-
-      // Esperar todos los futures y filtrar nulls
-      final users = (await Future.wait(futures)).whereType<User>().toList();
+          answer: dataEncuestaUser['answer'],
+          date: dataEncuestaUser['date'],
+        ));
+      }
 
       // 3. Ordenar por estado y luego por nombre, igual que antes
       users.sort((a, b) {
@@ -435,19 +325,22 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            alignment: Alignment.center,
-            actionsAlignment: MainAxisAlignment.center,
-            title: Text('USUARIOS POR RESPONDER - $titulo'),
+            title: Text('Respuestas · $titulo'),
             content: SizedBox(
-              width: double.maxFinite,
+              width: 520,
               child: ListView.builder(
                 shrinkWrap: true,
                 itemCount: users.length,
                 itemBuilder: (BuildContext context, int index) {
                   return ListTile(
-                    leading: Text(users[index].status),
-                    title: Text(users[index].data['name']),
-                    subtitle: Text(users[index].id), // ID del usuario
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(users[index].data['name'] ?? ''),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: statusChip(users[index].status)),
+                    ),
                     trailing: IconButton(
                       onPressed: () {
                         if (users[index].status != 'ABIERTA') {
@@ -475,15 +368,18 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                'El usuario no ha inicilizado esta encuesta',
+                                'Esta persona aún no ha iniciado la encuesta.',
                               ),
                             ),
                           );
                         }
                       },
+                      tooltip: users[index].status == 'GUARDADA'
+                          ? 'Ver o completar borrador'
+                          : 'Ver respuestas',
                       icon: const Icon(
                         Icons.remove_red_eye_outlined,
-                        color: Colors.blueAccent,
+                        color: Marca.c600,
                       ),
                     ),
                   );
@@ -492,7 +388,7 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
             ),
             actions: <Widget>[
               TextButton(
-                child: const Text('CERRAR'),
+                child: const Text('Cerrar'),
                 onPressed: () {
                   Navigator.of(context).pop();
                 },
@@ -531,4 +427,87 @@ class User {
       required this.data,
       required this.answer,
       required this.date});
+}
+
+class _TarjetaEncuesta extends StatelessWidget {
+  final dynamic item;
+  final VoidCallback onEditar;
+  final VoidCallback onVer;
+  final VoidCallback onCorreo;
+  final VoidCallback onEliminar;
+
+  const _TarjetaEncuesta({
+    required this.item,
+    required this.onEditar,
+    required this.onVer,
+    required this.onCorreo,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
+    final estado = item['data']['status'] ?? '';
+    final total = item['usuariosTotal'];
+    final pendientes = item['usuariosNonEnviada'];
+    final conteo = (total != null && pendientes != null)
+        ? '$pendientes por responder de $total'
+        : '';
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppTheme.radioTarjeta),
+        onTap: onEditar,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(item['data']['name'] ?? '',
+                        style: tema.titleMedium),
+                  ),
+                  const SizedBox(width: 8),
+                  statusChip(estado),
+                  const SizedBox(width: 8),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                  '${item['id'] ?? ''}  ·  ${item['data']['startDate']} - ${item['data']['endDate']}',
+                  style: tema.bodySmall),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(conteo, style: tema.bodyMedium),
+                  ),
+                  IconButton(
+                    tooltip: 'Ver quién ha respondido',
+                    onPressed: onVer,
+                    icon: const Icon(Icons.remove_red_eye_outlined,
+                        color: Marca.c600),
+                  ),
+                  IconButton(
+                    tooltip: 'Enviar invitaciones por correo',
+                    onPressed: estado == 'ACTIVA' ? onCorreo : null,
+                    icon: const Icon(Icons.email_outlined),
+                  ),
+                  IconButton(
+                    tooltip: estado == 'CREADA'
+                        ? 'Eliminar encuesta'
+                        : 'Solo se eliminan encuestas sin enviar',
+                    onPressed: estado == 'CREADA' ? onEliminar : null,
+                    icon: Icon(Icons.delete_outline_outlined,
+                        color: estado == 'CREADA' ? Tinta.error : null),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -2,12 +2,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:forms_app/services/firebase_services.dart';
+import 'package:forms_app/theme/app_theme.dart';
 import 'package:forms_app/widgets/forms_widgets.dart';
+import 'package:forms_app/widgets/page_body.dart';
 
 class ListParameterScreen extends StatefulWidget {
   final String param;
 
-  ListParameterScreen({super.key, required this.param});
+  const ListParameterScreen({super.key, required this.param});
 
   @override
   // ignore: library_private_types_in_public_api
@@ -15,95 +17,129 @@ class ListParameterScreen extends StatefulWidget {
 }
 
 class _ListParameterScreenState extends State<ListParameterScreen> {
-
-  void _reloadList() {
-    setState(() {}); // Empty setState just to trigger rebuild
-  }
+  late Future<List<Map<String, dynamic>>> _futuro;
 
   @override
   void initState() {
     super.initState();
+    _futuro = getParametro(widget.param);
+  }
+
+  void _reloadList() {
+    setState(() {
+      _futuro = getParametro(widget.param);
+    });
+  }
+
+  bool _dialogoAbierto = false;
+
+  Future<void> _abrir({Map<String, dynamic>? item}) async {
+    if (_dialogoAbierto) return; // evita abrir dos diálogos con un doble toque
+    _dialogoAbierto = true;
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AddEditParam(
+          param: widget.param,
+          reloadList: _reloadList,
+          id: item?['id'],
+          name: item?['data']['name'],
+          status: item?['data']['status'],
+        );
+      },
+    );
+    _dialogoAbierto = false;
   }
 
   @override
   Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
+    final titulo = widget.param[0].toUpperCase() +
+        widget.param.substring(1).toLowerCase();
     return Scaffold(
-      appBar: AppBar(
-        title: Center(child: Text('ADMINISTRACIÓN DE ${widget.param.toUpperCase()}')),
+      appBar: AppBar(title: Text(titulo)),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _abrir(),
+        icon: const Icon(Icons.add),
+        label: const Text('Agregar'),
       ),
-      body: Padding(
-        padding: EdgeInsets.fromLTRB(350, 50, 350, 50),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.param.toUpperCase(),
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'ESTADO',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _futuro,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: 'No pudimos cargar la lista',
+              message: 'Revisa tu conexión e inténtalo de nuevo.',
+              actionLabel: 'Reintentar',
+              onAction: _reloadList,
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final items = snapshot.data!;
+          final pendientes =
+              items.where((e) => e['data']['status'] == 'PENDIENTE').length;
+          return PageBody(
+            maxWidth: 760,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(titulo, style: tema.headlineSmall),
+                const SizedBox(height: 4),
+                Text('${items.length} registros. Toca uno para editarlo.',
+                    style: tema.bodyMedium),
+                if (pendientes > 0) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Tinta.avisoFondo,
+                      borderRadius: BorderRadius.circular(AppTheme.radioCampo),
+                    ),
+                    child: Text(
+                      pendientes == 1
+                          ? 'Hay 1 registro pendiente de revisión. Ábrelo para activarlo o inactivarlo.'
+                          : 'Hay $pendientes registros pendientes de revisión. Ábrelos para activarlos o inactivarlos.',
+                      style: const TextStyle(color: Tinta.aviso),
+                    ),
                   ),
                 ],
-              ), // Add spacing between header and FutureBuilder
+                const SizedBox(height: 16),
+                if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: Text('Todavía no hay registros.')),
+                  ),
+                for (final item in items) ...[
+                  Card(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppTheme.radioTarjeta),
+                      onTap: () => _abrir(item: item),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(item['data']['name'] ?? '',
+                                  style: tema.titleMedium),
+                            ),
+                            const SizedBox(width: 12),
+                            statusChip(item['data']['status'] ?? ''),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                const SizedBox(height: 72),
+              ],
             ),
-            SizedBox(height: 10),
-            Expanded(
-              child: FutureBuilder(
-                future: getParametro(widget.param),
-                builder: ((context, snapshot) {
-                  if (snapshot.hasData) {
-                    return ListView.builder(
-                      itemCount: snapshot.data?.length,
-                      itemBuilder: (context, index) {
-                        final item = snapshot.data?[index];
-                        return ListTile(
-                          leading: SizedBox(child: item?['data']['status'] == 'PENDIENTE' ? Icon(Icons.circle, color: Colors.red,) : SizedBox()),
-                          title: Text(item?['data']['name']),
-                          trailing: Text(item?['data']['status'], style: TextStyle(fontSize: 14),),
-                          onTap: () {
-                            // Open edit dialog or perform edit action here
-                            showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return AddEditParam(
-                                  param: widget.param,
-                                  reloadList: _reloadList,
-                                  id: item?['id'], // Accessing the document ID
-                                  name: item?['data']['name'],
-                                  status: item?['data']['status'],
-                                );
-                              },
-                            );
-                          },
-                        );
-                      },
-                    );
-                  } else {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                }),
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AddEditParam(param: widget.param, reloadList: _reloadList);
-            },
           );
         },
-        child: Icon(Icons.add),
       ),
     );
   }
@@ -149,34 +185,42 @@ class _AddEditParamState extends State<AddEditParam> {
   Widget build(BuildContext context) {
     final List<String> estados = ['ACTIVO', 'INACTIVO'];
 
+    final nombreParam = widget.param.toLowerCase();
     return AlertDialog(
-      title: Center(child: Text(isEditing ? 'EDITAR ${widget.param.toUpperCase()}' : 'AGREGAR ${widget.param.toUpperCase()}')),
+      title: Text(isEditing ? 'Editar $nombreParam' : 'Agregar a $nombreParam'),
       content: SizedBox(
-        height: 200,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(300, 30, 300, 30),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              buildTextField('NOMBRE', nameController, false),
-              SizedBox(height: 20),
-              buildDropdownField('ESTADO', estados, (value) {
-                setState(() {
-                  selectedEstado = value ?? 'ACTIVO';
-                });
-              }, initialValue: selectedEstado, allowChange: true),
-            ],
-          ),
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            buildTextField('NOMBRE', nameController, false),
+            const SizedBox(height: 16),
+            buildDropdownField('ESTADO', estados, (value) {
+              setState(() {
+                selectedEstado = value ?? 'ACTIVO';
+              });
+            }, initialValue: selectedEstado, allowChange: true),
+          ],
         ),
       ),
       actions: [
-        isLoading
-            ? Center(child: CircularProgressIndicator()) // Show loading indicator
-            : TextButton(
-                onPressed: () {
-                  if (isLoading) return; // Prevent further actions if loading
+        TextButton(
+          onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: isLoading
+              ? null
+              : () {
+                  if (nameController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Escribe un nombre.')),
+                    );
+                    return;
+                  }
                   setState(() {
-                    isLoading = true; // Set loading state to true
+                    isLoading = true;
                   });
                   if (isEditing) {
                     _updateParameter(context);
@@ -184,13 +228,13 @@ class _AddEditParamState extends State<AddEditParam> {
                     _saveParameter(context);
                   }
                 },
-                child: Text(isEditing ? 'GUARDAR' : 'AGREGAR'),
-              ),
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          child: Text('CANCELAR'),
+          child: isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : Text(isEditing ? 'Guardar' : 'Agregar'),
         ),
       ],
     );
@@ -205,7 +249,7 @@ class _AddEditParamState extends State<AddEditParam> {
       // Show a success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Parámetro guardado exitosamente.'),
+          content: Text('Guardado.'),
           duration: Duration(seconds: 4),
         ),
       );
@@ -216,7 +260,7 @@ class _AddEditParamState extends State<AddEditParam> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al guardar el parámetro: $e'),
+          content: Text('No se pudo guardar: $e'),
           duration: Duration(seconds: 4),
         ),
       );
@@ -235,12 +279,12 @@ class _AddEditParamState extends State<AddEditParam> {
     String param = widget.param;
 
     try {
-      updateParameter(id, param, nombre, estado);
+      await updateParameter(id, param, nombre, estado);
 
       // Show a success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Parámetro actualizado exitosamente.'),
+          content: Text('Cambios guardados.'),
           duration: Duration(seconds: 4),
         ),
       );
@@ -253,7 +297,7 @@ class _AddEditParamState extends State<AddEditParam> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al actualizar el parámetro: $e'),
+          content: Text('No se pudo actualizar: $e'),
           duration: Duration(seconds: 4),
         ),
       );

@@ -1,7 +1,36 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 final FirebaseFirestore db = FirebaseFirestore.instance;
+
+class _CatalogoEnCache {
+  final DateTime leidoEn;
+  final List<Map<String, dynamic>> docs;
+  _CatalogoEnCache(this.leidoEn, this.docs);
+}
+
+const Duration _vigenciaCatalogo = Duration(minutes: 5);
+final Map<String, _CatalogoEnCache> _catalogos = {};
+
+/// Lee un catálogo (Cargos, Profesiones, Proyectos, Actividades) una sola vez
+/// y lo reutiliza unos minutos. Cambian poco y se pedían completos en cada
+/// pantalla. Cada elemento es {'id': ..., 'data': {...}}.
+Future<List<Map<String, dynamic>>> catalogo(String param,
+    {bool forzar = false}) async {
+  final guardado = _catalogos[param];
+  if (!forzar &&
+      guardado != null &&
+      DateTime.now().difference(guardado.leidoEn) < _vigenciaCatalogo) {
+    return guardado.docs;
+  }
+  final snap = await db.collection(param).get();
+  final docs = [
+    for (final d in snap.docs) {'id': d.id, 'data': d.data()}
+  ];
+  _catalogos[param] = _CatalogoEnCache(DateTime.now(), docs);
+  return docs;
+}
+
+void invalidarCatalogo(String param) => _catalogos.remove(param);
 
 Future<List<Map<String, dynamic>>> getParametro(String param) async {
   List<Map<String, dynamic>> parametroList = [];
@@ -19,8 +48,8 @@ Future<List<Map<String, dynamic>>> getParametro(String param) async {
 
   // Custom sort function
   parametroList.sort((a, b) {
-    String statusA = a['data']['status'];
-    String statusB = b['data']['status'];
+    String statusA = a['data']['status'] ?? '';
+    String statusB = b['data']['status'] ?? '';
 
     // First sort by status
     int statusComparison = compareStatus(statusA, statusB);
@@ -65,65 +94,28 @@ Future<String> getFormState(String formId, String userId) async {
   }
 }
 
-Future<String> getUserRole() async {
-  // Obtener el usuario autenticado
-  User? user = FirebaseAuth.instance.currentUser;
-
-  if (user != null) {
-    // Obtener el ID del usuario
-    String userId = user.uid;
-
-    // Buscar el documento en la colección "Usuarios"
-    DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('Usuarios').doc(userId).get();
-
-    if (userDoc.exists) {
-      // Retornar el campo 'rol'
-      return userDoc['rol'];
-    } else {
-      throw Exception('Documento de usuario no encontrado');
-    }
-  } else {
-    throw Exception('No hay un usuario autenticado');
-  }
-}
-
 Future<List<Map<String, dynamic>>> getUsuarios() async {
   final List<Map<String, dynamic>> usersList = [];
   final CollectionReference usuarios = db.collection('Usuarios');
-  final CollectionReference positions = db.collection('Cargos');
-  final CollectionReference professions = db.collection('Profesiones');
 
-  // Lanzamos las 3 consultas en paralelo
-  final futures = await Future.wait([
-    positions.get(),
-    professions.get(),
+  // Usuarios en vivo; Cargos y Profesiones salen de la caché (se leen en paralelo)
+  final resultados = await Future.wait([
+    catalogo('Cargos'),
+    catalogo('Profesiones'),
     usuarios.get(),
   ]);
+  final cargos = resultados[0] as List<Map<String, dynamic>>;
+  final profesiones = resultados[1] as List<Map<String, dynamic>>;
+  final QuerySnapshot users = resultados[2] as QuerySnapshot;
 
-  // ignore: unnecessary_cast
-  final QuerySnapshot positionDocs = futures[0] as QuerySnapshot;
-  // ignore: unnecessary_cast
-  final QuerySnapshot professionDocs = futures[1] as QuerySnapshot;
-  // ignore: unnecessary_cast
-  final QuerySnapshot users = futures[2] as QuerySnapshot;
-
-  // Mapear id -> nombre de cargos
-  final Map<String, String> positionNames = {};
-  for (var document in positionDocs.docs) {
-    final data = document.data() as Map<String, dynamic>?;
-    if (data != null && data.containsKey('name')) {
-      positionNames[document.id] = data['name'] as String;
-    }
-  }
-
-  // Mapear id -> nombre de profesiones
-  final Map<String, String> professionNames = {};
-  for (var document in professionDocs.docs) {
-    final data = document.data() as Map<String, dynamic>?;
-    if (data != null && data.containsKey('name')) {
-      professionNames[document.id] = data['name'] as String;
-    }
-  }
+  final Map<String, String> positionNames = {
+    for (final c in cargos)
+      if (c['data']['name'] != null) c['id']: c['data']['name'] as String
+  };
+  final Map<String, String> professionNames = {
+    for (final p in profesiones)
+      if (p['data']['name'] != null) p['id']: p['data']['name'] as String
+  };
 
   // Usuarios
   for (var document in users.docs) {
@@ -178,23 +170,24 @@ Future<List<Map<String, dynamic>>> getEncuestas() async {
   final formSnap =
       await forms.where('status', isNotEqualTo: 'ELIMINADA').get();
 
-  // Procesamos cada encuesta en paralelo
+  // Solo se necesitan dos números por encuesta: se piden como agregados
+  // (count) en vez de descargar todas las respuestas de cada persona.
   final futures = formSnap.docs.map((document) async {
-    // Subcolección Usuarios de esta encuesta
     final usuariosSubcollection =
         forms.doc(document.id).collection('Usuarios');
-    final usuariosSnapshot = await usuariosSubcollection.get();
-
-    final int totalUsuarios = usuariosSnapshot.size;
-    final int nonEnviadaCount = usuariosSnapshot.docs
-        .where((doc) => doc['status'] != 'ENVIADA')
-        .length;
+    final conteos = await Future.wait([
+      usuariosSubcollection.count().get(),
+      usuariosSubcollection
+          .where('status', isNotEqualTo: 'ENVIADA')
+          .count()
+          .get(),
+    ]);
 
     return {
       'id': document.id,
       'data': document.data(),
-      'usuariosTotal': totalUsuarios,
-      'usuariosNonEnviada': nonEnviadaCount,
+      'usuariosTotal': conteos[0].count ?? 0,
+      'usuariosNonEnviada': conteos[1].count ?? 0,
     };
   }).toList();
 
@@ -205,44 +198,6 @@ Future<List<Map<String, dynamic>>> getEncuestas() async {
   return formsList;
 }
 
-
-Future<Map<String, dynamic>?> getEncuestaWithUsers(String encuestaId) async {
-  // Reference to the specific "Encuesta" document
-  final DocumentReference encuestaDocRef = db.collection('Encuestas').doc(encuestaId);
-
-  // Get the "Encuesta" document
-  DocumentSnapshot encuestaDoc = await encuestaDocRef.get();
-
-  // Check if the "Encuesta" document exists and its status is not 'ELIMINADA' or 'CREADA'
-  if (encuestaDoc.exists) {
-    var encuestaData = encuestaDoc.data() as Map<String, dynamic>?;
-    if (encuestaData != null && encuestaData['status'] != 'ELIMINADA' && encuestaData['status'] != 'CREADA') {
-      // Reference to the "Usuarios" subcollection within the current "Encuesta" document
-      final CollectionReference usuariosCollection = encuestaDocRef.collection('Usuarios');
-
-      // Query the "Usuarios" subcollection
-      QuerySnapshot usuariosSnapshot = await usuariosCollection.get();
-
-      // Convert the documents to a list of maps
-      List<Map<String, dynamic>> usuariosList = usuariosSnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
-
-      // Sort the list of users alphabetically by the 'name' field
-      usuariosList.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
-
-      // Create a map for the "Encuesta" document with the sorted users list
-      Map<String, dynamic> encuesta = {
-        'id': encuestaDoc.id,
-        'data': encuestaData,
-        'users': usuariosList,
-      };
-
-      return encuesta;
-    }
-  }
-
-  // Return null if no matching document is found or the conditions are not met
-  return null;
-}
 
 Future<List<Map<String, dynamic>>> getEncuestasUser(String uid) async {
   final firestore = FirebaseFirestore.instance;
@@ -299,7 +254,7 @@ Future<String> saveParameter(String param, String nombre, String estado) async {
     'status': estado.toUpperCase(),
   });
 
-  print('Parameter saved successfully');
+  invalidarCatalogo(param);
   return docId; // Return the new document ID
 }
 
@@ -328,8 +283,8 @@ Future<String> idGenerator(CollectionReference ref, String collection) async {
 
   int counter = 0;
   String inicio = '';
-  QuerySnapshot snapshot = await ref.get();
-  counter = snapshot.size + 1;
+  // Basta con contar; antes se descargaba toda la colección solo para eso.
+  counter = ((await ref.count().get()).count ?? 0) + 1;
   if(collection == 'Proyectos'){
     inicio = 'PR';
   } else if (collection == 'Profesiones'){
@@ -345,24 +300,13 @@ Future<String> idGenerator(CollectionReference ref, String collection) async {
   return idGenerated;
 }
 
-void updateParameter(String id, String param, String nombre, String estado) {
-  FirebaseFirestore.instance.collection(param).doc(id).update({
+Future<void> updateParameter(
+    String id, String param, String nombre, String estado) async {
+  await FirebaseFirestore.instance.collection(param).doc(id).update({
     'name': nombre.toUpperCase(),
     'status': estado.toUpperCase(),
-  }).then((value) {
-    print('Parameter saved successfully');
-  }).catchError((error) {
-    print('Failed to save parameter: $error');
   });
-}
-
-Future<List<String>> getParamAuto(String param) async {
-  List<String> parametros = [];
-  QuerySnapshot? queryParametros = await db.collection(param).where('status', isEqualTo: 'ACTIVO').get();
-  for (var doc in queryParametros.docs) {
-    parametros.add(doc['name']);
-  }
-  return parametros;
+  invalidarCatalogo(param);
 }
 
 Future<String?> fetchParameter(String param, String id) async {

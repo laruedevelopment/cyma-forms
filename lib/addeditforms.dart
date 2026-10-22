@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:forms_app/services/firebase_services.dart';
 import 'package:forms_app/services/hours_utils.dart';
 import 'package:forms_app/widgets/forms_widgets.dart';
+import 'package:forms_app/widgets/page_body.dart';
 
 class AddEditForm extends StatefulWidget {
   final String? id; // Nullable to differentiate between adding and editing
@@ -18,7 +19,8 @@ class AddEditForm extends StatefulWidget {
   final String tipo;
   final VoidCallback reloadList;
 
-  AddEditForm({
+  const AddEditForm({
+    super.key,
     this.id,
     this.name,
     this.startDate,
@@ -52,7 +54,8 @@ class _AddEditFormState extends State<AddEditForm> {
   TextEditingController hoursController = TextEditingController();
   List<String> statuses = ['CREADA', 'ACTIVA', 'CERRADA'];
   late QuerySnapshot activeUsersSnapshot;
-  bool isLoading = false;
+  // Al editar, el botón de guardar espera a que carguen las personas ya asignadas.
+  late bool isLoading = widget.id != null;
 
   @override
   void initState() {
@@ -119,28 +122,20 @@ class _AddEditFormState extends State<AddEditForm> {
       Map<String, String> positionNames = {};
       Map<String, String> professionNames = {};
 
-      final CollectionReference positions =
-          FirebaseFirestore.instance.collection('Cargos');
-      final CollectionReference professions =
-          FirebaseFirestore.instance.collection('Profesiones');
-      final positionQuery = positions.get();
-      final professionQuery = professions.get();
-      final results = await Future.wait([positionQuery, professionQuery]);
-
-      final positionDocs = results[0].docs;
-      final professionDocs = results[1].docs;
+      final results = await Future.wait([
+        catalogo('Cargos'),
+        catalogo('Profesiones'),
+      ]);
 
       positionNames = {
-        for (var document in positionDocs)
-          document.id:
-              (document.data() as Map<String, dynamic>)['name'] as String? ??
-                  'Unknown Position'
+        for (var d in results[0])
+          d['id'] as String:
+              d['data']['name'] as String? ?? 'Unknown Position'
       };
       professionNames = {
-        for (var document in professionDocs)
-          document.id:
-              (document.data() as Map<String, dynamic>)['name'] as String? ??
-                  'Unknown Profession'
+        for (var d in results[1])
+          d['id'] as String:
+              d['data']['name'] as String? ?? 'Unknown Profession'
       };
 
       setState(() {
@@ -168,18 +163,21 @@ class _AddEditFormState extends State<AddEditForm> {
         preloadedSelection = List<bool>.filled(
             activeUsers.length, false); // Initialize preloadedSelection
 
-        if (widget.id != null) {
-          _loadSelectedUsers(widget.id!);
-          if (preloadedSelection.length == activeUsers.length) {
-            selectAll = true;
-          }
-        } else {
-          userSelection = List<bool>.filled(activeUsers.length, false);
-        }
       });
+      if (widget.id != null) {
+        await _loadSelectedUsers(widget.id!);
+      }
     } catch (e) {
       print('Error loading active users: $e');
-      // Handle the error, e.g., show a Snackbar or an alert
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'No pudimos cargar a las personas. Cierra y vuelve a abrir la encuesta.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -191,6 +189,7 @@ class _AddEditFormState extends State<AddEditForm> {
         .get();
     var selectedUsersIds =
         selectedUsersSnapshot.docs.map((doc) => doc.id).toList();
+    if (!mounted) return;
 
     setState(() {
       for (int i = 0; i < activeUsers.length; i++) {
@@ -217,70 +216,125 @@ class _AddEditFormState extends State<AddEditForm> {
     });
   }
 
+  String _filtro = '';
+
+  String get _textoBoton {
+    if (activarEncuesta && widget.status != 'CREADA') {
+      if (selectedStatus == 'CERRADA') {
+        return widget.status != selectedStatus
+            ? 'Cerrar encuesta'
+            : 'Guardar cambios';
+      }
+      return widget.status != selectedStatus
+          ? 'Activar encuesta'
+          : 'Guardar cambios';
+    }
+    return widget.id == null ? 'Crear encuesta' : 'Guardar cambios';
+  }
+
+  void _seleccionarTodos(bool value) {
+    setState(() {
+      selectAll = value;
+      userSelection = List<bool>.filled(activeUsers.length, value);
+      selectedUsers.clear();
+      if (value) {
+        selectedUsers.addAll(activeUsers
+            .where((user) => user['userId'] != null)
+            .map((user) => user['userId'] as String));
+      }
+    });
+  }
+
+  Widget _seccion(BuildContext context, String titulo, Widget hijo) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(titulo, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 14),
+            hijo,
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
+    final ancho = MediaQuery.of(context).size.width;
+    final angosto = ancho < 640;
+    final q = _filtro.trim().toLowerCase();
+    final indices = <int>[
+      for (int i = 0; i < activeUsers.length; i++)
+        if (q.isEmpty ||
+            '${activeUsers[i]['name'] ?? ''} ${activeUsers[i]['professionName']} ${activeUsers[i]['positionName']} ${activeUsers[i]['sede'] ?? ''}'
+                .toLowerCase()
+                .contains(q))
+          i
+    ];
+    final puedeElegir = selectedStatus == 'CREADA';
+    final totalElegidos = userSelection.where((e) => e).length;
+
+    Widget campoDias = TextFormField(
+      controller: daysController,
+      keyboardType: TextInputType.number,
+      inputFormatters: <TextInputFormatter>[
+        FilteringTextInputFormatter.digitsOnly
+      ],
+      decoration: const InputDecoration(labelText: 'DÍAS HÁBILES'),
+      onChanged: (value) {
+        hoursController.text = calcularHorasEsperadas(value).toString();
+      },
+    );
+
+    Widget fila(List<Widget> hijos) => angosto
+        ? Column(children: [
+            for (final h in hijos) ...[h, const SizedBox(height: 14)]
+          ])
+        : Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              for (int i = 0; i < hijos.length; i++) ...[
+                Expanded(child: hijos[i]),
+                if (i < hijos.length - 1) const SizedBox(width: 14),
+              ]
+            ]),
+          );
+
     return Scaffold(
       appBar: AppBar(
-        title: Center(
-            child: Text(
-                widget.id != null ? 'EDITAR ENCUESTA' : 'AGREGAR ENCUESTA')),
+        title: Text(widget.id != null ? 'Editar encuesta' : 'Nueva encuesta'),
       ),
       body: Stack(
         children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(350, 50, 350, 50),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(height: 10),
-                  buildTextField('NOMBRE', nameController, false),
-                  SizedBox(height: 10),
-                  Row(
+          PageBody(
+            maxWidth: 900,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _seccion(
+                  context,
+                  'Datos de la encuesta',
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                          child: buildDateField(
-                              'FECHA DE INICIO', startDateController, context)),
-                      SizedBox(width: 10),
-                      Expanded(
-                          child: buildDateField('FECHA DE FINALIZACIÓN',
-                              endDateController, context)),
-                    ],
-                  ),
-                  SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          width: 600,
-                          child: TextFormField(
-                            controller: daysController,
-                            readOnly: false,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: <TextInputFormatter>[
-                              FilteringTextInputFormatter.digitsOnly
-                            ],
-                            decoration: InputDecoration(
-                              labelText: 'DÍAS HÁBILES',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 16.0, vertical: 12.0),
-                            ),
-                            onChanged: (value) {
-                              hoursController.text =
-                                  calcularHorasEsperadas(value).toString();
-                            },
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: buildTextField(
-                            'HORAS ESPERADAS', hoursController, true),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: buildDropdownField('ESTADO', statuses, (value) {
+                      buildTextField('NOMBRE', nameController, false),
+                      const SizedBox(height: 14),
+                      fila([
+                        buildDateField(
+                            'FECHA DE INICIO', startDateController, context),
+                        buildDateField('FECHA DE FINALIZACIÓN',
+                            endDateController, context),
+                      ]),
+                      fila([
+                        campoDias,
+                        buildTextField('HORAS ESPERADAS', hoursController, true),
+                      ]),
+                      fila([
+                        buildDropdownField('ESTADO', statuses, (value) {
                           setState(() {
                             selectedStatus = value ?? 'CREADA';
                           });
@@ -290,196 +344,93 @@ class _AddEditFormState extends State<AddEditForm> {
                                 widget.id == null || widget.status == 'CREADA'
                                     ? false
                                     : true),
-                      ),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: activarEncuesta,
-                              onChanged: widget.status == 'CREADA' ||
-                                      widget.status == null
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('Activar la encuesta al guardar'),
+                          value: activarEncuesta,
+                          onChanged:
+                              widget.status == 'CREADA' || widget.status == null
                                   ? (bool? value) {
                                       setState(() {
                                         activarEncuesta = value ?? false;
                                       });
                                     }
                                   : null,
-                            ),
-                            Text('ACTIVAR ENCUESTA'),
-                          ],
                         ),
-                      ),
+                      ]),
                     ],
                   ),
-                  SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          flex: 4,
-                          child: Text(
-                            'NOMBRE',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                ),
+                const SizedBox(height: 16),
+                _seccion(
+                  context,
+                  'Quién responde ($totalElegidos de ${activeUsers.length})',
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        onChanged: (v) => setState(() => _filtro = v),
+                        decoration: const InputDecoration(
+                          hintText: 'Buscar por nombre, profesión, cargo o sede',
+                          prefixIcon: Icon(Icons.search),
                         ),
-                        Expanded(
-                          flex: 4,
-                          child: Text(
-                            'PROFESIÓN',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 4,
-                          child: Text(
-                            'CARGO',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 4,
-                          child: Text(
-                            'SEDE',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 1,
-                          child: Text(
-                            'ESTADO',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Expanded(flex: 1, child: SizedBox())
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  Divider(),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                    child: Visibility(
-                      visible: selectedStatus == 'CREADA',
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text('SELECCIONAR TODOS'),
-                          Checkbox(
-                              value: selectAll,
-                              onChanged: (bool? value) {
-                                setState(() {
-                                  selectAll = value ?? false;
-                                  userSelection = List<bool>.filled(
-                                      activeUsers.length, selectAll);
-                                  selectedUsers
-                                      .clear(); // Clear the selected users list
-                                  if (selectAll) {
-                                    // If "Select All" is checked, add all user IDs to the list
-                                    selectedUsers.addAll(activeUsers
-                                        .where((user) =>
-                                            user.containsKey('userId') &&
-                                            user['userId'] != null)
-                                        .map((user) => user['userId']!));
-                                    // Also add all emails to the list
-                                    print(activeUsers);
-                                    print(selectedUsers);
-                                  }
-                                });
-                              }),
-                        ],
                       ),
-                    ),
+                      if (puedeElegir)
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('Seleccionar a todos'),
+                          value: selectAll,
+                          onChanged: (v) => _seleccionarTodos(v ?? false),
+                        ),
+                      const Divider(height: 1),
+                      if (indices.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: Text(
+                                activeUsers.isEmpty
+                                    ? 'No hay usuarios activos para este tipo de encuesta.'
+                                    : 'Nadie coincide con la búsqueda.',
+                                style: tema.bodyMedium),
+                          ),
+                        ),
+                      for (final index in indices)
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text(activeUsers[index]['name'] ?? ''),
+                          subtitle: Text(
+                              '${activeUsers[index]['professionName']}  ·  ${activeUsers[index]['positionName']}  ·  ${activeUsers[index]['sede'] ?? ''}'),
+                          value: userSelection[index],
+                          onChanged: selectedStatus == 'CERRADA' ||
+                                  (preloadedSelection[index] &&
+                                      selectedStatus != 'CREADA')
+                              ? null
+                              : (bool? selected) {
+                                  final userId = activeUsers[index]['userId'];
+                                  setState(() {
+                                    userSelection[index] = selected!;
+                                    if (selected) {
+                                      selectedUsers.add(userId);
+                                    } else {
+                                      selectedUsers.remove(userId);
+                                    }
+                                    _updateSelectAll();
+                                  });
+                                },
+                        ),
+                    ],
                   ),
-                  Divider(),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                    child: SizedBox(
-                      height: 400,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: activeUsers.length,
-                        itemBuilder: (context, index) {
-                          var user = activeUsers[index];
-                          var userId = activeUsersSnapshot.docs[index].id;
-                          return Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                      flex: 4, child: Text(user['name'] ?? '')),
-                                  Expanded(
-                                      flex: 4,
-                                      child: Text(user['professionName'])),
-                                  Expanded(
-                                      flex: 4,
-                                      child: Text(user['positionName'])),
-                                  Expanded(
-                                      flex: 4, child: Text(user['sede'] ?? '')),
-                                  Expanded(
-                                      flex: 1,
-                                      child: Text(
-                                          user['status'] ?? 'NO ASIGNADA')),
-                                  Expanded(
-                                    flex: 1,
-                                    child: Checkbox(
-                                      value: userSelection[index],
-                                      onChanged: selectedStatus == 'CERRADA' ||
-                                              (preloadedSelection[index] &&
-                                                  selectedStatus != 'CREADA')
-                                          ? null // Disable the checkbox if status is 'CERRADA' or if it was preloaded selected
-                                          : (bool? selected) {
-                                              setState(() {
-                                                userSelection[index] =
-                                                    selected!;
-                                                if (selected) {
-                                                  selectedUsers.add(userId);
-                                                } else {
-                                                  selectedUsers.remove(userId);
-                                                }
-                                                _updateSelectAll();
-                                              });
-                                            },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Divider()
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 30),
-                  SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: isLoading
-                        ? null
-                        : () {
-                            _saveOrEditSurvey();
-                          },
-                    child: Text((activarEncuesta && widget.status != 'CREADA')
-                        ? (selectedStatus == 'CERRADA'
-                            ? (widget.status != selectedStatus
-                                ? 'CERRAR ENCUESTA'
-                                : 'GUARDAR CAMBIOS ENCUESTA CERRADA')
-                            : (widget.status != selectedStatus
-                                ? 'ACTIVAR ENCUESTA'
-                                : 'GUARDAR CAMBIOS ENCUESTA ACTIVA'))
-                        : 'GUARDAR CAMBIOS ENCUESTA'),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 20),
+                firebaseButton(context, _textoBoton, _saveOrEditSurvey,
+                    loading: isLoading),
+                const SizedBox(height: 24),
+              ],
             ),
           ),
-          if (isLoading)
-            Center(
-              child: CircularProgressIndicator(),
-            ),
         ],
       ),
     );
@@ -501,7 +452,7 @@ class _AddEditFormState extends State<AddEditForm> {
   void _saveOrEditSurvey() async {
     if (!_validateForm()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('POR FAVOR, COMPLETE TODOS LOS CAMPOS')),
+        const SnackBar(content: Text('Completa todos los campos: nombre, fechas y días hábiles.')),
       );
       return;
     }
@@ -529,7 +480,7 @@ class _AddEditFormState extends State<AddEditForm> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('EL NOMBRE DE LA ENCUESTA YA ESTÁ EN USO.'),
+            content: Text('Ya existe una encuesta con ese nombre.'),
             duration: Duration(seconds: 4),
           ),
         );
@@ -545,20 +496,20 @@ class _AddEditFormState extends State<AddEditForm> {
       if (widget.id != null) {
         await _updateSurvey();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('¡ENCUESTA ACTUALIZADA EXITOSAMENTE!')),
+          const SnackBar(content: Text('Encuesta actualizada.')),
         );
       } else {
         if (selectedUsers.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text('POR FAVOR, SELECCIONE AL MENOS UN USUARIO')),
+                content: Text('Elige al menos una persona para la encuesta.')),
           );
           return;
         }
 
         await _addSurvey();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('¡ENCUESTA CREADA EXITOSAMENTE!')),
+          const SnackBar(content: Text('Encuesta creada.')),
         );
       }
 
@@ -566,7 +517,7 @@ class _AddEditFormState extends State<AddEditForm> {
       Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ERROR: $e')),
+        SnackBar(content: Text('No se pudo guardar: $e')),
       );
     } finally {
       setState(() {
@@ -597,11 +548,11 @@ class _AddEditFormState extends State<AddEditForm> {
         .map((entry) => activeUsersSnapshot.docs[entry.key].id)
         .toList();
 
-    for (var userId in selectedUserIds) {
-      await newSurveyDoc.collection('Usuarios').doc(userId).set({
-        'status': 'ABIERTA',
-      });
-    }
+    await _escribirEnLotes([
+      for (final userId in selectedUserIds)
+        (b) => b.set(newSurveyDoc.collection('Usuarios').doc(userId),
+            {'status': 'ABIERTA'})
+    ]);
   }
 
   Future<void> _updateSurvey() async {
@@ -624,22 +575,46 @@ class _AddEditFormState extends State<AddEditForm> {
       var userCollection = surveyDoc.collection('Usuarios');
       var currentUsers = await userCollection.get();
 
-      // Delete users not in selectedUsers and whose status is not 'ENVIADA'
+      final existentes = currentUsers.docs.map((d) => d.id).toSet();
+      final operaciones = <void Function(WriteBatch)>[];
+
+      // Quita a quien ya no está elegido, salvo si ya envió su respuesta.
+      // Solo a quienes se podían ver en la lista: quien ya no está activo
+      // (o cambió de rol) conserva su registro.
+      final visibles = activeUsers.map((u) => u['userId']).toSet();
       for (var doc in currentUsers.docs) {
-        var docData = doc.data();
-        if (!selectedUsers.contains(doc.id) && docData['status'] != 'ENVIADA') {
-          await userCollection.doc(doc.id).delete();
+        if (visibles.contains(doc.id) &&
+            !selectedUsers.contains(doc.id) &&
+            doc.data()['status'] != 'ENVIADA') {
+          operaciones.add((b) => b.delete(userCollection.doc(doc.id)));
         }
       }
 
-      // Add new users from selectedUsers if they are not already present
-      for (var userId in selectedUsers) {
-        if (!currentUsers.docs.any((doc) => doc.id == userId)) {
-          await userCollection.doc(userId).set({'status': 'ABIERTA'});
+      // Agrega a quienes se eligieron y todavía no estaban.
+      for (var userId in selectedUsers.toSet()) {
+        if (!existentes.contains(userId)) {
+          operaciones.add((b) =>
+              b.set(userCollection.doc(userId), {'status': 'ABIERTA'}));
         }
       }
+      await _escribirEnLotes(operaciones);
     } catch (e) {
       print('Failed to update survey: $e');
+      rethrow;
+    }
+  }
+
+  /// Escribe en lotes de hasta 400 operaciones (límite de Firestore: 500)
+  /// en vez de una petición por persona.
+  Future<void> _escribirEnLotes(
+      List<void Function(WriteBatch)> operaciones) async {
+    const tamano = 400;
+    for (int i = 0; i < operaciones.length; i += tamano) {
+      final batch = FirebaseFirestore.instance.batch();
+      for (final op in operaciones.skip(i).take(tamano)) {
+        op(batch);
+      }
+      await batch.commit();
     }
   }
 }

@@ -461,6 +461,10 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                                 uidUser: users[index].id,
                                 hours: hours,
                                 formState: users[index].status,
+                                // Un admin puede completar un borrador por la persona;
+                                // lo ya enviado se ve en solo lectura.
+                                onBehalfOfName:
+                                    users[index].data['name'] as String?,
                                 answers: users[index].answer,
                                 date: (users[index].date as Timestamp).toDate(),
                                 reloadList: _reloadList,

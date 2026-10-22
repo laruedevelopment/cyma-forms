@@ -77,6 +77,14 @@ service cloud.firestore {
       allow update, delete: if catalog in ['Proyectos', 'Actividades'] && isAdmin();
     }
 
+    // Registro de acciones de administradores sobre encuestas ajenas.
+    // Solo se agrega: nadie lo edita ni lo borra.
+    match /Auditoria/{id} {
+      allow read: if isStaff();
+      allow create: if isAdmin() && request.resource.data.actorUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
     // Encuestas: lectura para usuarios autenticados, escritura solo admin.
     match /Encuestas/{encuestaId} {
       allow read: if signedIn();
@@ -88,10 +96,23 @@ service cloud.firestore {
         // Alta al registrarse: solo su propio documento, abierto.
         allow create: if isAdmin()
           || (isSelf(uid) && request.resource.data.status == 'ABIERTA');
-        // Una persona edita lo suyo hasta que lo envía; después solo el admin.
-        allow update: if isAdmin()
-          || (isSelf(uid) && resource.data.status != 'ENVIADA');
-        allow delete: if isAdmin();
+        // Una persona edita lo suyo hasta que lo envía. Un administrador puede
+        // completar un BORRADOR por otra persona, pero: (1) nunca toca lo ya
+        // enviado, (2) debe quedar identificado en editedBy, y (3) si lo envía,
+        // en sentBy. Nadie puede falsificar esos campos.
+        allow update: if (isAdmin()
+            && resource.data.status != 'ENVIADA'
+            && (!request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAny(['answer', 'date'])
+                || request.resource.data.editedBy == request.auth.uid)
+            && (request.resource.data.status != 'ENVIADA'
+                || request.resource.data.sentBy == request.auth.uid))
+          || (isSelf(uid)
+            && resource.data.status != 'ENVIADA'
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAny(['editedBy', 'editedAt', 'sentBy']));
+        // Las respuestas ya enviadas no se borran.
+        allow delete: if isAdmin() && resource.data.status != 'ENVIADA';
       }
     }
   }

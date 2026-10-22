@@ -20,6 +20,8 @@ class FormsPage extends StatefulWidget {
   final String answers;
   final DateTime date;
   final VoidCallback reloadList;
+  // Si no es null, un administrador está completando la encuesta de esa persona.
+  final String? onBehalfOfName;
   FormsPage({
     super.key,
     required this.idForm,
@@ -31,6 +33,7 @@ class FormsPage extends StatefulWidget {
     required this.answers,
     required this.date,
     required this.reloadList,
+    this.onBehalfOfName,
   });
 
   @override
@@ -38,6 +41,17 @@ class FormsPage extends StatefulWidget {
 }
 
 class _FormsPageState extends State<FormsPage> {
+  bool get _onBehalf => widget.onBehalfOfName != null;
+
+  String _confirmText() {
+    final base = (double.tryParse(expectedHours) ?? 0) != totalHours
+        ? 'Registraste $totalHours h y se esperan $expectedHours h. ¿Enviar de todas formas? Esta acción no es reversible.'
+        : 'Esta acción no es reversible.';
+    return _onBehalf
+        ? 'Vas a enviar esta encuesta en nombre de ${widget.onBehalfOfName}. Quedará registrado que la envió tu usuario.\n\n$base'
+        : base;
+  }
+
   // Controllers
   final TextEditingController idTypeController = TextEditingController();
   final TextEditingController nameController = TextEditingController();
@@ -338,6 +352,24 @@ class _FormsPageState extends State<FormsPage> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            if (_onBehalf) ...[
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF3CD),
+                                  border: Border.all(
+                                      color: const Color(0xFFFFC107)),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Estás completando la encuesta de ${widget.onBehalfOfName} como administrador. Los cambios y el envío quedarán registrados a tu nombre.',
+                                  style: const TextStyle(
+                                      color: Color(0xFF5D4B00),
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             Card(
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -502,12 +534,7 @@ class _FormsPageState extends State<FormsPage> {
                                                 title: Text(
                                                     '¿Está seguro de que desea enviar la encuesta?'),
                                                 content: Text(
-                                                  (double.tryParse(
-                                                                  expectedHours) ??
-                                                              0) !=
-                                                          totalHours
-                                                      ? 'Registraste $totalHours h y se esperan $expectedHours h. ¿Enviar de todas formas? Esta acción no es reversible.'
-                                                      : 'Esta acción no es reversible.',
+                                                  _confirmText(),
                                                   style:
                                                       TextStyle(fontSize: 18),
                                                 ),
@@ -736,6 +763,13 @@ class _FormsPageState extends State<FormsPage> {
                                                 alreadyEnviada = true;
                                                 return;
                                               }
+                                              // Si un administrador actúa por otra persona,
+                                              // queda identificado en el documento y en
+                                              // el registro de auditoría.
+                                              final actor = FirebaseAuth
+                                                  .instance.currentUser?.uid;
+                                              final onBehalf = actor != null &&
+                                                  actor != widget.uidUser;
                                               transaction.update(docRef, {
                                                 'answer': resultString,
                                                 'status': sheetsOk
@@ -743,7 +777,28 @@ class _FormsPageState extends State<FormsPage> {
                                                     : 'GUARDADA',
                                                 'date': now,
                                                 'idencuesta': widget.idForm,
+                                                if (onBehalf) 'editedBy': actor,
+                                                if (onBehalf) 'editedAt': now,
+                                                if (onBehalf && sheetsOk)
+                                                  'sentBy': actor,
                                               });
+                                              if (onBehalf) {
+                                                transaction.set(
+                                                    FirebaseFirestore.instance
+                                                        .collection('Auditoria')
+                                                        .doc(),
+                                                    {
+                                                      'encuestaId':
+                                                          widget.idForm,
+                                                      'targetUid':
+                                                          widget.uidUser,
+                                                      'actorUid': actor,
+                                                      'action': sheetsOk
+                                                          ? 'ENVIO_POR'
+                                                          : 'EDITO_BORRADOR',
+                                                      'at': now,
+                                                    });
+                                              }
                                             });
 
                                             if (alreadyEnviada) {

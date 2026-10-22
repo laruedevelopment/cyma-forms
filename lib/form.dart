@@ -1,6 +1,7 @@
 // ignore_for_file: prefer_typing_uninitialized_variables, use_build_context_synchronously
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
@@ -148,11 +149,17 @@ class _FormsPageState extends State<FormsPage> {
     while (attempt < maxRetries) {
       attempt++;
       try {
+        // Token de sesión de Firebase: el script lo valida para confirmar que
+        // quien envía es el dueño de las filas (idusuario).
+        final idToken =
+            await FirebaseAuth.instance.currentUser?.getIdToken() ?? '';
+
         // Enviar como application/x-www-form-urlencoded (sin especificar headers)
         final resp = await http.post(
           Uri.parse(scriptURL),
           body: {
             'submissionId': submissionId,
+            'idToken': idToken,
             'rows': convert.jsonEncode(
                 rows), // rows va como JSON en un campo de formulario
           },

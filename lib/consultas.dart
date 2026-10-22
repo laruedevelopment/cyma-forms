@@ -16,6 +16,9 @@ class ConsultasPage extends StatefulWidget {
   State<ConsultasPage> createState() => _ConsultasPageState();
 }
 
+/// Alto de la barra inferior de Power BI que se recorta.
+const String _barraInferior = '48px';
+
 class _ConsultasPageState extends State<ConsultasPage> {
   String? _viewType;
   bool _loading = true;
@@ -38,13 +41,22 @@ class _ConsultasPageState extends State<ConsultasPage> {
         final viewType = 'consultas-powerbi-${link.hashCode}';
         ui_web.platformViewRegistry.registerViewFactory(
           viewType,
-          (int viewId) => html.IFrameElement()
-            ..src = link
-            ..style.border = 'none'
-            ..style.width = '100%'
-            ..style.height = '100%'
-            ..setAttribute('referrerpolicy', 'no-referrer')
-            ..setAttribute('allowfullscreen', 'true'),
+          (int viewId) {
+            // La barra inferior de Power BI (compartir, páginas) queda fuera del
+            // recuadro: el iframe es más alto y el contenedor recorta el exceso.
+            final marco = html.IFrameElement()
+              ..src = link
+              ..style.border = 'none'
+              ..style.width = '100%'
+              ..style.height = 'calc(100% + $_barraInferior)'
+              ..setAttribute('referrerpolicy', 'no-referrer')
+              ..setAttribute('allowfullscreen', 'true');
+            return html.DivElement()
+              ..style.width = '100%'
+              ..style.height = '100%'
+              ..style.overflow = 'hidden'
+              ..append(marco);
+          },
         );
         _viewType = viewType;
       }

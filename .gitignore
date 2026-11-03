@@ -60,3 +60,6 @@ app.*.map.json
 /assets/fonts/
 /assets/packages/
 /assets/shaders/
+
+# Código del Apps Script (lleva el ID de la hoja): vive en Apps Script y en este equipo
+apps-script/

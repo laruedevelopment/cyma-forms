@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:forms_app/addeditforms.dart';
 import 'package:forms_app/services/firebase_services.dart';
 import 'package:forms_app/services/hours_utils.dart';
+import 'package:forms_app/services/invitaciones.dart';
 import 'package:forms_app/theme/app_theme.dart';
 import 'package:forms_app/widgets/forms_widgets.dart';
 import 'package:forms_app/widgets/page_body.dart';
@@ -218,16 +219,104 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
     }
   }
 
-  // El envío de invitaciones por correo está fuera de servicio: el servicio
-  // anterior (Zoho vía nocodeapi) fue dado de baja. Pendiente de un reemplazo
-  // que corra en un servidor y no en el navegador.
+  /// Recordatorio por correo a quienes aún no han enviado la encuesta.
   void confirmacionEmail(BuildContext context, String id, String nameEncuesta) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-            'El envío de invitaciones por correo no está disponible por ahora.'),
-        duration: Duration(seconds: 5),
-      ),
+    final cuerpo = TextEditingController(
+        text: 'Hola, el área técnica de CyMA te invita a responder la última encuesta. '
+            'Presiona el siguiente enlace para entrar a la plataforma de Encuestas MOP.\n\n'
+            'https://cyma-encuestasmop.github.io/EncuestasMOP/\n\n'
+            'Si ya la respondiste, ignora este correo.\n\n'
+            'Cordial saludo,\nEquipo CyMA - Encuestas MOP');
+    final pendientes = contarPendientes(id);
+    bool enviando = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(builder: (dialogContext, setDialog) {
+          return AlertDialog(
+            title: const Text('Enviar recordatorio'),
+            content: SizedBox(
+              width: 560,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FutureBuilder<ResultadoInvitacion>(
+                      future: pendientes,
+                      builder: (context, snap) {
+                        if (!snap.hasData) {
+                          return const Text('Revisando quién falta por responder…');
+                        }
+                        final r = snap.data!;
+                        if (!r.ok) {
+                          return Text(
+                              r.mensaje.isEmpty ? 'No se pudo revisar la lista.' : r.mensaje,
+                              style: const TextStyle(color: Tinta.error));
+                        }
+                        return Text(
+                          r.destinatarios == 0
+                              ? 'Todas las personas ya enviaron "$nameEncuesta". No hay a quién avisar.'
+                              : 'Se enviará a ${r.destinatarios} personas que aún no han enviado "$nameEncuesta". Nadie verá los correos de las demás.',
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: cuerpo,
+                      maxLines: 10,
+                      minLines: 6,
+                      decoration: const InputDecoration(labelText: 'Mensaje'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: enviando ? null : () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancelar'),
+              ),
+              FutureBuilder<ResultadoInvitacion>(
+                future: pendientes,
+                builder: (context, snap) {
+                  final hayA = snap.hasData && snap.data!.ok && snap.data!.destinatarios > 0;
+                  return ElevatedButton(
+                    onPressed: (!hayA || enviando)
+                        ? null
+                        : () async {
+                            setDialog(() => enviando = true);
+                            final r = await enviarInvitaciones(id, cuerpo.text);
+                            if (!dialogContext.mounted) return;
+                            Navigator.of(dialogContext).pop();
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(
+                                content: Text(r.ok
+                                    ? 'Recordatorio enviado a ${r.destinatarios} personas.'
+                                    : (r.mensaje.isEmpty
+                                        ? 'No se pudo enviar el recordatorio.'
+                                        : r.mensaje)),
+                                duration: const Duration(seconds: 7),
+                              ),
+                            );
+                          },
+                    child: enviando
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Text('Enviar recordatorio'),
+                  );
+                },
+              ),
+            ],
+          );
+        });
+      },
     );
   }
 

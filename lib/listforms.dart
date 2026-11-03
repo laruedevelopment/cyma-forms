@@ -282,13 +282,38 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
               FutureBuilder<ResultadoInvitacion>(
                 future: pendientes,
                 builder: (context, snap) {
+                  if (!(snap.hasData && snap.data!.permitePrueba)) {
+                    return const SizedBox.shrink();
+                  }
+                  return OutlinedButton(
+                    onPressed: enviando
+                        ? null
+                        : () async {
+                            setDialog(() => enviando = true);
+                            final r = await enviarPrueba(nameEncuesta, cuerpo.text);
+                            if (!dialogContext.mounted) return;
+                            setDialog(() => enviando = false);
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(
+                                content: Text(r.mensaje),
+                                duration: const Duration(seconds: 6),
+                              ),
+                            );
+                          },
+                    child: const Text('Enviarme una prueba'),
+                  );
+                },
+              ),
+              FutureBuilder<ResultadoInvitacion>(
+                future: pendientes,
+                builder: (context, snap) {
                   final hayA = snap.hasData && snap.data!.ok && snap.data!.destinatarios > 0;
                   return ElevatedButton(
                     onPressed: (!hayA || enviando)
                         ? null
                         : () async {
                             setDialog(() => enviando = true);
-                            final r = await enviarInvitaciones(id, cuerpo.text);
+                            final r = await enviarInvitaciones(id, nameEncuesta, cuerpo.text);
                             if (!dialogContext.mounted) return;
                             Navigator.of(dialogContext).pop();
                             if (!mounted) return;

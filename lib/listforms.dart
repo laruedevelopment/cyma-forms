@@ -283,7 +283,7 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
               FutureBuilder<ResultadoInvitacion>(
                 future: pendientes,
                 builder: (context, snap) {
-                  if (!(snap.hasData && snap.data!.permitePrueba)) {
+                  if (!(snap.hasData && snap.data!.ok)) {
                     return const SizedBox.shrink();
                   }
                   return OutlinedButton(
@@ -291,7 +291,7 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                         ? null
                         : () async {
                             setDialog(() => enviando = true);
-                            final r = await enviarPrueba(nameEncuesta, cuerpo.text);
+                            final r = await enviarPrueba(id, cuerpo.text);
                             if (!dialogContext.mounted) return;
                             setDialog(() => enviando = false);
                             ScaffoldMessenger.of(this.context).showSnackBar(
@@ -314,7 +314,7 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                         ? null
                         : () async {
                             setDialog(() => enviando = true);
-                            final r = await enviarInvitaciones(id, nameEncuesta, cuerpo.text);
+                            final r = await enviarInvitaciones(id, cuerpo.text);
                             if (!dialogContext.mounted) return;
                             Navigator.of(dialogContext).pop();
                             if (!mounted) return;

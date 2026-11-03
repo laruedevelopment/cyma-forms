@@ -226,7 +226,8 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
             'Presiona el siguiente enlace para entrar a la plataforma de Encuestas MOP.\n\n'
             'https://cyma-encuestasmop.github.io/EncuestasMOP/\n\n'
             'Si ya la respondiste, ignora este correo.\n\n'
-            'Cordial saludo,\nEquipo CyMA - Encuestas MOP');
+            'Cordial saludo,\nEquipo CyMA - Encuestas MOP\n\n'
+            'Este es un envío automático. Si necesitas ayuda, responde a este mensaje: te atenderá el área técnica de CyMA.');
     final pendientes = contarPendientes(id);
     bool enviando = false;
 

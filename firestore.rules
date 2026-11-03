@@ -79,8 +79,10 @@ service cloud.firestore {
 
     // Configuración de la app (p. ej. enlace del informe de consultas).
     // La leen los administradores y consultores; solo un MASTER la modifica.
+    // `correo` guarda el enlace de nocodeapi (lleva una clave): solo lo leen
+    // administradores, no los consultores.
     match /Configuracion/{id} {
-      allow read: if isStaff();
+      allow read: if id == 'correo' ? isAdmin() : isStaff();
       allow write: if isMaster();
     }
 

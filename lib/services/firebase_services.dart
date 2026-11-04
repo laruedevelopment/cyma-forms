@@ -280,24 +280,30 @@ void saveUser(String id, String idType, String name, String phone, String email,
 }
 
 Future<String> idGenerator(CollectionReference ref, String collection) async {
-
-  int counter = 0;
-  String inicio = '';
-  // Basta con contar; antes se descargaba toda la colección solo para eso.
-  counter = ((await ref.count().get()).count ?? 0) + 1;
-  if(collection == 'Proyectos'){
+  String inicio;
+  if (collection == 'Proyectos') {
     inicio = 'PR';
-  } else if (collection == 'Profesiones'){
+  } else if (collection == 'Profesiones') {
     inicio = 'PF';
-  } else if (collection == 'Cargos'){
+  } else if (collection == 'Cargos') {
     inicio = 'CG';
-  } else if (collection == 'Actividades'){
+  } else if (collection == 'Actividades') {
     inicio = 'AC';
   } else {
     inicio = collection[0];
   }
-  String idGenerated = inicio + counter.toString().padLeft(4, '0');
-  return idGenerated;
+  // Siguiente número después del MAYOR existente (no del conteo): si se borran
+  // registros, un conteo repetiría ids y pisaría datos.
+  int mayor = 0;
+  final ultimo = await ref
+      .orderBy(FieldPath.documentId, descending: true)
+      .limit(1)
+      .get();
+  if (ultimo.docs.isNotEmpty) {
+    final numero = ultimo.docs.first.id.replaceAll(RegExp(r'[^0-9]'), '');
+    mayor = int.tryParse(numero) ?? 0;
+  }
+  return inicio + (mayor + 1).toString().padLeft(4, '0');
 }
 
 Future<void> updateParameter(

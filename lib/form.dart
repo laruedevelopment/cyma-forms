@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:forms_app/services/firebase_services.dart';
 import 'package:forms_app/theme/app_theme.dart';
-import 'package:forms_app/widgets/forms_widgets.dart';
 import 'package:forms_app/widgets/page_body.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert' as convert;
@@ -65,6 +64,9 @@ class _FormsPageState extends State<FormsPage> {
   // Projects and activities
   List<Map<String, dynamic>> projects = [];
   List<Parametro> projectsList = [];
+  // Todos los registros (también inactivos): para mostrar el nombre de lo ya
+  // guardado en un borrador aunque hoy no se pueda volver a elegir.
+  final Map<String, List<Parametro>> _todos = {};
   List<Parametro> activitiesList = [];
   String expectedHours = '';
   double totalHours = 0;
@@ -125,11 +127,6 @@ class _FormsPageState extends State<FormsPage> {
       controller.dispose();
     }
     super.dispose();
-  }
-
-  void _reloadList() async {
-    await Future.wait([initPro(), initAct()]);
-    setState(() {});
   }
 
   Future<void> retrieveDataAndInit() async {
@@ -233,10 +230,13 @@ class _FormsPageState extends State<FormsPage> {
     // Proyectos y actividades se leen siempre al día: si un admin inactiva
     // uno, no debe seguir ofreciéndose.
     final docs = await catalogo(param, forzar: true);
+    _todos[param] = [
+      for (final d in docs)
+        Parametro(id: d['id'], name: (d['data']['name'] ?? '').toString())
+    ];
     return [
       for (final d in docs)
-        if (widget.formState == 'ENVIADA' ||
-            (d['data']['status'] != null && d['data']['status'] != 'INACTIVO'))
+        if (widget.formState == 'ENVIADA' || d['data']['status'] == 'ACTIVO')
           Parametro(id: d['id'], name: d['data']['name'] ?? '')
     ];
   }
@@ -454,43 +454,6 @@ class _FormsPageState extends State<FormsPage> {
                               ),
                             ),
                             SizedBox(height: 20),
-                            Visibility(
-                              visible: /*widget.formState != 'ENVIADA'*/ false,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                        onPressed: () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (BuildContext context) {
-                                              return AddParam(
-                                                  param: 'Proyectos',
-                                                  reloadList: _reloadList);
-                                            },
-                                          );
-                                        },
-                                        child: Text('AGREGAR NUEVO PROYECTO')),
-                                  ),
-                                  SizedBox(width: 20),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                        onPressed: () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (BuildContext context) {
-                                              return AddParam(
-                                                  param: 'Actividades',
-                                                  reloadList: _reloadList);
-                                            },
-                                          );
-                                        },
-                                        child: Text('AGREGAR NUEVA ACTIVIDAD')),
-                                  ),
-                                ],
-                              ),
-                            ),
                             SizedBox(height: 20),
                             _barraAcciones(),
                           ],
@@ -659,26 +622,26 @@ class _FormsPageState extends State<FormsPage> {
   }
 
   /// Guarda el borrador o envía la encuesta, según `enviarEncuesta`.
-  /// Nombres de proyectos o actividades elegidos que hoy están INACTIVOS.
+  /// Nombres de proyectos o actividades elegidos que hoy ya no están ACTIVOS.
   Future<List<String>> _inactivosElegidos() async {
     try {
       final r = await Future.wait([
         catalogo('Proyectos', forzar: true),
         catalogo('Actividades', forzar: true),
       ]);
-      Set<String> inactivos(List<Map<String, dynamic>> docs) => {
+      Set<String> activos(List<Map<String, dynamic>> docs) => {
             for (final d in docs)
-              if (d['data']['status'] == 'INACTIVO')
+              if (d['data']['status'] == 'ACTIVO')
                 (d['data']['name'] ?? '').toString().trim()
           };
-      final proyectos = inactivos(r[0]);
-      final actividades = inactivos(r[1]);
+      final proyectos = activos(r[0]);
+      final actividades = activos(r[1]);
       final elegidos = <String>[];
       for (int i = 0; i < projectControllers.length; i++) {
         final pr = projectControllers[i].text.trim();
         final ac = activityControllers[i].text.trim();
-        if (proyectos.contains(pr)) elegidos.add(pr);
-        if (actividades.contains(ac)) elegidos.add(ac);
+        if (pr.isNotEmpty && !proyectos.contains(pr)) elegidos.add(pr);
+        if (ac.isNotEmpty && !actividades.contains(ac)) elegidos.add(ac);
       }
       return elegidos;
     } catch (_) {
@@ -1130,7 +1093,7 @@ class _FormsPageState extends State<FormsPage> {
         if (proyecto!.isEmpty) {
           return 'Elige un proyecto de la lista';
         } else if (!projectsList.any((project) => project.name == proyecto)) {
-          return 'Ese proyecto no está en la lista';
+          return 'Ya no está disponible. Elige otro de la lista';
         } else {
           return null;
         }
@@ -1140,15 +1103,6 @@ class _FormsPageState extends State<FormsPage> {
           dense: true,
           title: Text(project.name),
         );
-      },
-      onSaved: (proyecto) async {
-        if (proyecto != null &&
-            !projectsList.any((project) => project.name == proyecto)) {
-          await saveParameter('Proyectos', proyecto, 'PENDIENTE');
-          projectsList.add(Parametro(
-              id: DateTime.now().toString(),
-              name: proyecto)); // Temporarily add the new project
-        }
       },
       noItemsFoundBuilder: (context) {
         return const SizedBox.shrink();
@@ -1175,7 +1129,7 @@ class _FormsPageState extends State<FormsPage> {
         if (activity!.isEmpty) {
           return 'Elige una actividad de la lista';
         } else if (!activitiesList.any((act) => act.name == activity)) {
-          return 'Esa actividad no está en la lista';
+          return 'Ya no está disponible. Elige otra de la lista';
         } else {
           return null;
         }
@@ -1185,12 +1139,6 @@ class _FormsPageState extends State<FormsPage> {
           dense: true,
           title: Text(activity.name),
         );
-      },
-      onSaved: (activity) async {
-        // Save the ocupacion to Firebase if it's a new value
-        if (!activitiesList.any((act) => act.name == activity)) {
-          saveParameter('Actividades', activity!, 'PENDIENTE');
-        }
       },
       noItemsFoundBuilder: (context) {
         return const SizedBox.shrink();
@@ -1301,14 +1249,16 @@ class _FormsPageState extends State<FormsPage> {
 
   String getProjectNameById(String id) {
     if (id.isEmpty) return '';
-    var project = projectsList.firstWhere((p) => p.id == id,
+    var project = (_todos['Proyectos'] ?? projectsList).firstWhere(
+        (p) => p.id == id,
         orElse: () => Parametro(id: '', name: ''));
     return project.name;
   }
 
   String getActivityNameById(String id) {
     if (id.isEmpty) return '';
-    var activity = activitiesList.firstWhere((a) => a.id == id,
+    var activity = (_todos['Actividades'] ?? activitiesList).firstWhere(
+        (a) => a.id == id,
         orElse: () => Parametro(id: '', name: ''));
     return activity.name;
   }
@@ -1318,99 +1268,4 @@ class Parametro {
   final String id;
   final String name;
   Parametro({required this.id, required this.name});
-}
-
-class AddParam extends StatefulWidget {
-  final String param;
-  final VoidCallback reloadList;
-
-  AddParam({required this.param, required this.reloadList});
-
-  @override
-  // ignore: library_private_types_in_public_api
-  _AddParamState createState() => _AddParamState();
-}
-
-class _AddParamState extends State<AddParam> {
-  late String id;
-  TextEditingController nameController = TextEditingController();
-  String selectedEstado = 'PENDIENTE';
-  bool isLoading = false; // Loading state
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Center(child: Text('AGREGAR ${widget.param.toUpperCase()}')),
-      content: SizedBox(
-        height: 200,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(300, 30, 300, 30),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              buildTextField('NOMBRE', nameController, false),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        isLoading
-            ? Center(
-                child: CircularProgressIndicator()) // Show loading indicator
-            : TextButton(
-                onPressed: () {
-                  if (isLoading) return; // Prevent further actions if loading
-                  setState(() {
-                    isLoading = true; // Set loading state to true
-                  });
-                  _saveParameter(context);
-                },
-                child: Text('AGREGAR'),
-              ),
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          child: Text('CANCELAR'),
-        ),
-      ],
-    );
-  }
-
-  void _saveParameter(BuildContext context) async {
-    String nombre = nameController.text;
-    String estado = selectedEstado;
-    String param = widget.param;
-    try {
-      await saveParameter(param, nombre, estado);
-      // Show a success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Parámetro guardado exitosamente.'),
-          duration: Duration(seconds: 4),
-        ),
-      );
-      // Clear the name field after saving
-      nameController.clear();
-      // Trigger a refresh of the list by calling setState
-      widget.reloadList();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al guardar el parámetro: $e'),
-          duration: Duration(seconds: 4),
-        ),
-      );
-    } finally {
-      Navigator.of(context).pop();
-      setState(() {
-        isLoading = false; // Reset loading state
-      });
-    }
-  }
 }

@@ -68,13 +68,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Proyectos y actividades: los usuarios pueden proponer nuevos (PENDIENTE).
+    // Proyectos y actividades: los lee cualquier persona con sesión y solo los
+    // administradores los crean, editan o borran (las personas ya no proponen).
     match /{catalog}/{id} {
       allow read: if signedIn() && catalog in ['Proyectos', 'Actividades'];
-      allow create: if catalog in ['Proyectos', 'Actividades']
-        && (isAdmin()
-            || (signedIn() && request.resource.data.status == 'PENDIENTE'));
-      allow update, delete: if catalog in ['Proyectos', 'Actividades'] && isAdmin();
+      allow create, update, delete: if catalog in ['Proyectos', 'Actividades'] && isAdmin();
     }
 
     // Configuración de la app (p. ej. enlace del informe de consultas).

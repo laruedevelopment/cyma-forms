@@ -268,6 +268,19 @@ Future<ResultadoInvitacion> enviarPrueba(
       destinatarios: 1);
 }
 
+/// El botón de prueba lo ve solo un MASTER.
+Future<bool> esMaster() async {
+  try {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return false;
+    final doc =
+        await FirebaseFirestore.instance.collection('Usuarios').doc(uid).get();
+    return doc.data()?['role'] == 'MASTER';
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Deja constancia de quién envió un recordatorio y a cuántas personas.
 Future<void> _auditar(String idEncuesta, int cantidad, String detalle) async {
   try {

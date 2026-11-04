@@ -229,6 +229,7 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
             'Cordial saludo,\nEquipo CyMA - Encuestas MOP\n\n'
             'Este es un envío automático. Si necesitas ayuda, responde a este mensaje: te atenderá el área técnica de CyMA.');
     final pendientes = contarPendientes(id);
+    final soyMaster = esMaster();
     bool enviando = false;
 
     showDialog(
@@ -280,10 +281,13 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                 onPressed: enviando ? null : () => Navigator.of(dialogContext).pop(),
                 child: const Text('Cancelar'),
               ),
-              FutureBuilder<ResultadoInvitacion>(
-                future: pendientes,
+              FutureBuilder<List<Object>>(
+                future: Future.wait<Object>([pendientes, soyMaster]),
                 builder: (context, snap) {
-                  if (!(snap.hasData && snap.data!.ok)) {
+                  // La prueba al propio correo la ve solo un MASTER.
+                  if (!(snap.hasData &&
+                      (snap.data![0] as ResultadoInvitacion).ok &&
+                      snap.data![1] == true)) {
                     return const SizedBox.shrink();
                   }
                   return OutlinedButton(

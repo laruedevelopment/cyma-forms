@@ -33,6 +33,8 @@ String _clave(String nombre) {
 class _ListParameterScreenState extends State<ListParameterScreen> {
   late Future<List<Map<String, dynamic>>> _futuro;
   bool _verInactivos = false;
+  final TextEditingController _busqueda = TextEditingController();
+  String _filtro = '';
 
   /// La limpieza solo aplica a proyectos y actividades: son lo que las
   /// respuestas guardan por código y lo que antes se podía crear libremente.
@@ -43,6 +45,12 @@ class _ListParameterScreenState extends State<ListParameterScreen> {
   void initState() {
     super.initState();
     _futuro = getParametro(widget.param);
+  }
+
+  @override
+  void dispose() {
+    _busqueda.dispose();
+    super.dispose();
   }
 
   void _reloadList() {
@@ -228,9 +236,17 @@ class _ListParameterScreenState extends State<ListParameterScreen> {
           final todos = snapshot.data!;
           final inactivos =
               todos.where((e) => e['data']['status'] == 'INACTIVO').length;
-          final items = _verInactivos
-              ? todos
-              : todos.where((e) => e['data']['status'] != 'INACTIVO').toList();
+          // La búsqueda ignora tildes, mayúsculas y signos: "ica seco" encuentra "ICÁ SECO".
+          final buscado = _clave(_filtro);
+          final items = todos.where((e) {
+            if (!_verInactivos && e['data']['status'] == 'INACTIVO') {
+              return false;
+            }
+            if (buscado.isEmpty) return true;
+            return _clave((e['data']['name'] ?? '').toString())
+                    .contains(buscado) ||
+                e['id'].toString().toLowerCase().contains(_filtro.trim().toLowerCase());
+          }).toList();
           final pendientes =
               todos.where((e) => e['data']['status'] == 'PENDIENTE').length;
 
@@ -267,6 +283,25 @@ class _ListParameterScreenState extends State<ListParameterScreen> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _busqueda,
+                  onChanged: (v) => setState(() => _filtro = v),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar por nombre o código',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _filtro.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Borrar búsqueda',
+                            icon: const Icon(Icons.close),
+                            onPressed: () => setState(() {
+                              _busqueda.clear();
+                              _filtro = '';
+                            }),
+                          ),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 12,
@@ -291,10 +326,22 @@ class _ListParameterScreenState extends State<ListParameterScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                if (_filtro.trim().isNotEmpty && items.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                        '${items.length} ${items.length == 1 ? 'resultado' : 'resultados'}',
+                        style: tema.bodySmall),
+                  ),
                 if (items.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: Text('Todavía no hay registros.')),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                        child: Text(_filtro.trim().isEmpty
+                            ? 'Todavía no hay registros.'
+                            : _verInactivos
+                                ? 'Nada coincide con la búsqueda.'
+                                : 'Nada coincide con la búsqueda. Prueba con "Mostrar inactivos".')),
                   ),
                 for (final item in items) ...[
                   Card(

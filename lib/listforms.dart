@@ -20,6 +20,27 @@ class ListFormsScreen extends StatefulWidget {
 }
 
 class _ListFormsScreenState extends State<ListFormsScreen> {
+  final TextEditingController _busqueda = TextEditingController();
+  String _filtro = '';
+
+  @override
+  void dispose() {
+    _busqueda.dispose();
+    super.dispose();
+  }
+
+  /// Minúsculas y sin tildes, para que la búsqueda no distinga ni una cosa ni la otra.
+  String _simple(String t) {
+    const de = 'áàäâéèëêíìïîóòöôúùüûñ';
+    const a = 'aaaaeeeeiiiioooouuuun';
+    final sb = StringBuffer();
+    for (final r in t.toLowerCase().runes) {
+      final c = String.fromCharCode(r);
+      final i = de.indexOf(c);
+      sb.write(i >= 0 ? a[i] : c);
+    }
+    return sb.toString();
+  }
   void _reloadList() {
     setState(() {
       _futuro = _cargar();
@@ -88,7 +109,16 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final encuestas = snapshot.data!;
+          final todas = snapshot.data!;
+          final buscado = _simple(_filtro.trim());
+          final encuestas = buscado.isEmpty
+              ? todas
+              : todas.where((e) {
+                  final d = e['data'];
+                  return _simple(
+                          '${e['id']} ${d['name'] ?? ''} ${d['startDate'] ?? ''} ${d['endDate'] ?? ''} ${d['status'] ?? ''}')
+                      .contains(buscado);
+                }).toList();
           return PageBody(
             maxWidth: 960,
             child: Column(
@@ -99,11 +129,40 @@ class _ListFormsScreenState extends State<ListFormsScreen> {
                 Text(
                     'Toca una encuesta para editarla. Con el ojo ves quién ha respondido.',
                     style: tema.bodyMedium),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _busqueda,
+                  onChanged: (v) => setState(() => _filtro = v),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar por nombre, código, fecha o estado',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _filtro.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Borrar búsqueda',
+                            icon: const Icon(Icons.close),
+                            onPressed: () => setState(() {
+                              _busqueda.clear();
+                              _filtro = '';
+                            }),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (_filtro.trim().isNotEmpty && encuestas.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                        '${encuestas.length} ${encuestas.length == 1 ? 'resultado' : 'resultados'}',
+                        style: tema.bodySmall),
+                  ),
                 if (encuestas.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: Text('Todavía no hay encuestas.')),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                        child: Text(_filtro.trim().isEmpty
+                            ? 'Todavía no hay encuestas.'
+                            : 'Ninguna encuesta coincide con la búsqueda.')),
                   ),
                 for (final item in encuestas) ...[
                   _TarjetaEncuesta(

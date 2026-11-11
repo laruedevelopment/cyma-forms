@@ -292,18 +292,16 @@ Future<String> idGenerator(CollectionReference ref, String collection) async {
   } else {
     inicio = collection[0];
   }
-  // Siguiente número después del MAYOR existente (no del conteo): si se borran
-  // registros, un conteo repetiría ids y pisaría datos.
-  int mayor = 0;
-  final ultimo = await ref
-      .orderBy(FieldPath.documentId, descending: true)
-      .limit(1)
-      .get();
-  if (ultimo.docs.isNotEmpty) {
-    final numero = ultimo.docs.first.id.replaceAll(RegExp(r'[^0-9]'), '');
-    mayor = int.tryParse(numero) ?? 0;
+  // Se parte del conteo y se avanza mientras el código ya exista. Así, aunque se
+  // hayan borrado registros (el conteo queda por debajo del mayor código), nunca
+  // se pisa uno existente. No se ordena por código descendente: esa consulta
+  // exige un índice compuesto en Firestore y fallaba al crear.
+  int numero = ((await ref.count().get()).count ?? 0) + 1;
+  for (int i = 0; i < 5000; i++, numero++) {
+    final id = inicio + numero.toString().padLeft(4, '0');
+    if (!(await ref.doc(id).get()).exists) return id;
   }
-  return inicio + (mayor + 1).toString().padLeft(4, '0');
+  throw Exception('No se pudo generar un código nuevo para $collection');
 }
 
 Future<void> updateParameter(
